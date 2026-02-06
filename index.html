@@ -1,0 +1,883 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"><title>AI 助手</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-light.min.css"><script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script><script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script><script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script><script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#fdfbf7;--bg2:#f5f2eb;--bg3:#ebe6db;--text:#2c2825;--text2:#8a837a;--accent:#cc5c35;--border:#e2dcd0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{font-size:17px;font-weight:600;display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#e07045);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:18px;height:18px;fill:#fff}
+.hbtns{display:flex;gap:6px}
+.ibtn{width:38px;height:38px;border:1px solid var(--border);background:var(--bg);border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ibtn:hover{background:var(--bg3);border-color:var(--accent)}
+.ibtn svg{width:18px;height:18px;stroke:var(--text2);fill:none;stroke-width:2}
+.model-select{position:relative}
+.model-dropdown{position:absolute;top:calc(100% + 6px);right:0;background:var(--bg);border:1px solid var(--border);border-radius:12px;min-width:220px;max-height:350px;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.1);display:none;z-index:100}
+.model-dropdown.show{display:block}
+.model-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px}
+.model-item:last-child{border-bottom:none}
+.model-item:hover{background:var(--bg2)}
+.model-item.active{background:#fff3ee;color:var(--accent);font-weight:600}
+.main{flex:1;display:flex;flex-direction:column;max-width:900px;width:100%;margin:0 auto;overflow:hidden;position:relative}
+.sidebar{position:fixed;left:-300px;top:0;width:300px;height:100%;background:var(--bg2);border-right:1px solid var(--border);z-index:99;transition:left .3s;display:flex;flex-direction:column}
+.sidebar.show{left:0}
+.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:98;display:none}
+.sidebar-overlay.show{display:block}
+.sidebar-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:16px}
+.history-list{flex:1;overflow-y:auto;padding:8px}
+.history-group-title{font-size:12px;color:var(--text2);padding:12px 12px 6px;font-weight:600}
+.history-item{padding:10px 12px;margin-bottom:2px;border-radius:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:14px;position:relative}
+.history-item:hover{background:var(--bg3)}
+.history-item.active{background:#fff3ee;border:1px solid var(--accent)}
+.history-info{flex:1;min-width:0}
+.history-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.history-time{font-size:11px;color:var(--text2);margin-top:2px}
+.history-menu-btn{width:24px;height:24px;display:flex;align-items:center;justify-content:center;opacity:0;color:var(--text2);border-radius:4px;flex-shrink:0}
+.history-item:hover .history-menu-btn{opacity:1}
+.history-menu{position:absolute;right:0;top:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.1);display:none;z-index:10;min-width:100px}
+.history-menu.show{display:block}
+.history-menu-item{padding:10px 14px;cursor:pointer;font-size:13px}
+.history-menu-item:hover{background:var(--bg2)}
+.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat{flex:1;overflow-y:auto;padding:20px;-webkit-overflow-scrolling:touch}
+.welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px}
+.welcome-icon{width:80px;height:80px;background:linear-gradient(135deg,var(--accent),#e07045);border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:24px;animation:float 3s ease-in-out infinite}
+.welcome-icon svg{width:40px;height:40px;fill:#fff}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.welcome h1{font-size:24px;margin-bottom:10px}
+.welcome p{font-size:15px;color:var(--text2);margin-bottom:24px;max-width:360px;line-height:1.6}
+.suggestions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.sug-btn{padding:10px 18px;background:var(--bg2);border:2px solid var(--border);border-radius:20px;font-size:14px;cursor:pointer;transition:.2s;color:var(--text)}
+.sug-btn:hover{background:#fff3ee;border-color:var(--accent);color:var(--accent);transform:translateY(-2px)}
+.msg{margin-bottom:20px;display:flex;flex-direction:column;max-width:100%}
+.msg.user{align-items:flex-end}
+.msg.assistant{align-items:flex-start}
+.msg-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.avatar{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.msg.assistant .avatar{background:linear-gradient(135deg,var(--accent),#e07045)}
+.msg.user .avatar{background:var(--bg3);border:1px solid var(--border)}
+.avatar svg{width:14px;height:14px}
+.msg.assistant .avatar svg{fill:#fff}
+.msg.user .avatar svg{stroke:var(--text2);fill:none;stroke-width:2}
+.model-name{font-size:13px;color:var(--text2);font-weight:600}
+.msg-content{display:flex;flex-direction:column;min-width:0;max-width:95%}
+.msg.user .msg-content{align-items:flex-end;max-width:85%}
+.bubble{padding:12px 16px;border-radius:16px;line-height:1.7;font-size:15px;word-wrap:break-word;overflow-wrap:break-word;word-break:break-word;min-width:0}
+.bubble:empty::before{content:'\200b'}
+.msg.assistant .bubble{background:#fff;border:1px solid var(--border);border-radius:16px 16px 16px 4px}
+.msg.user .bubble{background:linear-gradient(135deg,var(--accent),#d96840);color:#fff;border-radius:16px 16px 4px 16px}
+.bubble pre{overflow-x:auto;margin:10px 0;padding:12px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);font-size:13px;max-width:100%;max-height:250px;overflow-y:auto}
+.bubble pre code{white-space:pre;overflow-x:auto;display:block;font-family:'SF Mono',Monaco,Consolas,monospace}
+.bubble code{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:13px}
+.bubble :not(pre)>code{background:var(--bg2);padding:2px 6px;border-radius:4px}
+.bubble p{margin:8px 0}
+.bubble h1,.bubble h2,.bubble h3{margin:14px 0 8px}
+.bubble ul,.bubble ol{margin:8px 0;padding-left:24px}
+.bubble img{max-width:100%;border-radius:8px;margin:8px 0;display:block}
+.bubble .katex-display{overflow-x:auto;overflow-y:hidden;max-width:100%;padding:8px 0}
+.msg-files{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.msg-files img{max-width:200px;max-height:150px;border-radius:8px;cursor:pointer;transition:opacity .2s}
+.msg-files img:hover{opacity:0.9}
+.msg-files .file-tag{background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);padding:6px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#fff}
+.msg-files .file-tag:hover{background:rgba(255,255,255,0.3)}
+.msg-files .file-tag svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+.msg.assistant .msg-files .file-tag{background:var(--bg2);border:1px solid var(--border);color:var(--text)}
+.msg-footer{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--text2)}
+.msg.user .msg-footer{flex-direction:row-reverse}
+.msg-tools{display:flex;gap:4px;opacity:0;transition:opacity .2s}
+.msg:hover .msg-tools{opacity:1}
+@media(max-width:768px){.msg-tools{opacity:1}}
+.tool-btn{padding:4px;border-radius:4px;cursor:pointer;color:var(--text2)}
+.tool-btn:hover{background:var(--bg2);color:var(--accent)}
+.tool-btn svg{width:14px;height:14px;stroke-width:2}
+.version-control{display:flex;align-items:center;gap:4px;background:var(--bg2);padding:2px 6px;border-radius:12px;font-size:11px;font-weight:600}
+.vc-btn{cursor:pointer;padding:0 4px;font-weight:bold}
+.vc-btn:hover{color:var(--accent)}
+.vc-btn.disabled{opacity:0.3;cursor:default}
+.code-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.code-lang{font-size:12px;color:var(--text2)}
+.code-header-btns{display:flex;gap:4px;align-items:center}
+.code-btn{padding:4px;border-radius:4px;cursor:pointer;color:var(--text2);background:none;border:none;display:flex;align-items:center;justify-content:center}
+.code-btn:hover{background:var(--bg);color:var(--accent)}
+.code-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+.cursor{display:inline-block;width:2px;height:1em;background:var(--accent);animation:blink 1s infinite;vertical-align:text-bottom}
+@keyframes blink{50%{opacity:0}}
+.inputarea{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.input-container{border:2px solid var(--border);border-radius:14px;background:#fff;display:flex;flex-direction:column;transition:border-color .2s}
+.input-container:focus-within{border-color:var(--accent)}
+.file-preview{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px 0 12px}
+.file-preview:empty{display:none}
+.file-item{position:relative;background:var(--bg2);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:6px;max-width:180px}
+.file-item img{width:40px;height:40px;object-fit:cover;border-radius:6px}
+.file-item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-item .remove{cursor:pointer;color:var(--text2);font-size:14px}
+.file-item .remove:hover{color:#e74c3c}
+.file-item.loading{opacity:0.6}
+.file-item .loading-text{font-size:10px;color:var(--accent)}
+.input-text-area{padding:10px 12px;padding-bottom:0}
+.input-text-area textarea{width:100%;border:none;outline:none;font-size:15px;font-family:inherit;resize:none;line-height:1.5;max-height:200px;min-height:22px}
+.input-bottom{display:flex;align-items:center;justify-content:space-between;padding:6px 8px}
+.attach-btn{width:30px;height:30px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);border-radius:6px}
+.attach-btn:hover{background:var(--bg2);color:var(--accent)}
+.attach-btn svg{width:18px;height:18px}
+.input-right{display:flex;align-items:center;gap:8px}
+.token-display{font-size:11px;color:var(--text2);font-family:'SF Mono',Monaco,monospace}
+.sendbtn{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#d96840);color:#fff;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sendbtn svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2}
+.sendbtn .stop-icon{fill:#fff;stroke:none}
+.modal{position:fixed;inset:0;background:rgba(44,40,37,.5);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal.show{display:flex}
+.modal-content{background:var(--bg);border-radius:16px;width:92%;max-width:500px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:16px;font-weight:600}
+.modal-close{width:28px;height:28px;border:none;background:var(--bg2);border-radius:6px;cursor:pointer;color:var(--text2);font-size:14px}
+.modal-close:hover{background:var(--bg3);color:var(--accent)}
+.modal-body{padding:16px 18px;overflow-y:auto}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2)}
+.form-group input,.form-group textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit}
+.form-group input:focus,.form-group textarea:focus{outline:none;border-color:var(--accent)}
+.btn{padding:8px 14px;background:linear-gradient(135deg,var(--accent),#d96840);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;width:100%}
+.btn:hover{opacity:0.9}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.checkbox-group{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:13px}
+.checkbox-group input{width:14px;height:14px;accent-color:var(--accent)}
+.model-list{max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin:8px 0}
+.model-check-item{padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:13px}
+.model-check-item:last-child{border-bottom:none}
+.api-group{margin-bottom:12px}
+.api-group-title{font-size:12px;font-weight:600;color:var(--accent);padding:6px 0;border-bottom:1px solid var(--border);margin-bottom:6px}
+.added-model-item{padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.added-model-item .model-name{flex:1;min-width:0;font-size:12px;word-break:break-all;line-height:1.4}
+.del-btn{padding:4px 8px;background:transparent;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;flex-shrink:0}
+.del-btn:hover{background:#fee;border-color:#e74c3c;color:#e74c3c}
+.use-btn{padding:4px 8px;background:var(--bg2);border:1px solid var(--accent);border-radius:4px;cursor:pointer;font-size:11px;color:var(--accent);white-space:nowrap;flex-shrink:0}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;display:none;z-index:2000}
+.toast.show{display:block}
+.section-title{font-size:13px;font-weight:600;margin:14px 0 8px;color:var(--text)}
+.section-title:first-child{margin-top:0}
+.preview-modal{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:2000;padding:20px}
+.preview-modal.show{display:flex}
+.preview-modal .close-btn{position:fixed;top:20px;right:20px;width:40px;height:40px;background:rgba(255,255,255,.2);border:none;border-radius:50%;cursor:pointer;color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;z-index:10}
+.preview-modal .close-btn:hover{background:rgba(255,255,255,.3)}
+.preview-modal img{max-width:90%;max-height:85vh;border-radius:8px;object-fit:contain}
+.preview-modal .file-content{background:#fff;border-radius:12px;width:90%;max-width:700px;max-height:80vh;overflow:auto;padding:20px}
+.preview-modal .file-content pre{margin:0;white-space:pre-wrap;word-break:break-all;font-size:14px;line-height:1.6;font-family:'SF Mono',Monaco,Consolas,monospace}
+/* Export modal */
+.export-select-list{max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin:8px 0}
+.export-msg-item{padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.export-msg-item:last-child{border-bottom:none}
+.export-msg-item:hover{background:var(--bg2)}
+.export-msg-item input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent)}
+.export-msg-item .role-tag{font-size:11px;padding:2px 6px;border-radius:4px;font-weight:600;flex-shrink:0}
+.export-msg-item .role-tag.user{background:#fff3ee;color:var(--accent)}
+.export-msg-item .role-tag.assistant{background:var(--bg2);color:var(--text2)}
+.export-msg-item .msg-preview{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.export-btns{display:flex;gap:8px;margin-top:10px}
+.export-btns .btn{flex:1}
+/* HTML runner */
+.html-runner{border:1px solid var(--border);border-radius:8px;margin:8px 0;overflow:hidden}
+.html-runner-header{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)}
+.html-runner iframe{width:100%;border:none;min-height:200px;background:#fff}
+/* Custom name settings */
+.custom-name-item{padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:12px}
+.custom-name-item label{font-weight:500}
+</style>
+</head>
+<body>
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<div class="sidebar" id="sidebar">
+<div class="sidebar-header"><span>历史记录</span><button onclick="toggleSidebar()" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;width:24px;height:24px;cursor:pointer;color:var(--text2)">✕</button></div>
+<div class="history-list" id="historyList"></div>
+</div>
+<div class="header">
+<div class="logo"><div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div><span id="logoText">AI 助手</span></div>
+<div class="hbtns">
+<div class="model-select">
+<button class="ibtn" onclick="toggleModelDropdown()" title="选择模型"><svg viewBox="0 0 24 24" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></button>
+<div class="model-dropdown" id="modelDropdown"></div>
+</div>
+<button class="ibtn" onclick="toggleSidebar()" title="历史记录"><svg viewBox="0 0 24 24" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></button>
+<button class="ibtn" onclick="newChat()" title="新对话"><svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+<button class="ibtn" onclick="showSettings()" title="设置"><svg viewBox="0 0 24 24" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.38.23.84.36 1.32.36H21a2 2 0 0 1 0 4h-.09c-.48 0-.94.13-1.32.36z"/></svg></button>
+</div>
+</div>
+<div class="main">
+<div class="chat-area">
+<div class="welcome" id="welcome">
+<div class="welcome-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+<h1>你好，有什么可以帮你？</h1>
+<p id="welcomeText">我是 AI 助手，可以帮你回答问题、写代码、分析数据等。</p>
+<div class="suggestions">
+<button class="sug-btn" onclick="sendSuggestion('帮我写一个 Python 快速排序')">📝 写排序算法</button>
+<button class="sug-btn" onclick="sendSuggestion('解释什么是机器学习')">🧠 解释机器学习</button>
+<button class="sug-btn" onclick="sendSuggestion('帮我写一封商务邮件')">✉️ 写商务邮件</button>
+</div>
+</div>
+<div class="chat" id="chat" style="display:none"></div>
+<div class="inputarea">
+<div class="input-container">
+<div class="file-preview" id="filePreview"></div>
+<div class="input-text-area"><textarea id="input" rows="1" placeholder="输入消息..." oninput="autoResize(this);updateInputTokens()"></textarea></div>
+<div class="input-bottom">
+<button class="attach-btn" onclick="$('fileInput').click()" title="添加文件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+<input type="file" id="fileInput" multiple accept="image/*,.txt,.md,.json,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" style="display:none" onchange="handleFiles(this.files)">
+<div class="input-right">
+<span class="token-display" id="tokenDisplay">0t</span>
+<button class="sendbtn" id="sendBtn" onclick="handleSendClick()">
+<svg id="sendIcon" viewBox="0 0 24 24" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+<svg id="stopIcon" viewBox="0 0 24 24" style="display:none" class="stop-icon"><rect x="6" y="6" width="12" height="12" rx="2" fill="#fff"/></svg>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal" id="settingsModal">
+<div class="modal-content">
+<div class="modal-header"><div class="modal-title">设置</div><button class="modal-close" onclick="hideSettings()">✕</button></div>
+<div class="modal-body">
+<div class="section-title">界面设置</div>
+<div class="form-group">
+<div class="checkbox-group"><input type="checkbox" id="customTitleCheck" onchange="toggleCustomTitle()"><label for="customTitleCheck">自定义标题</label></div>
+<div style="display:flex;gap:6px"><input type="text" id="customTitleInput" placeholder="AI 助手" disabled style="flex:1"><button class="btn" onclick="saveCustomTitle()" style="width:auto;padding:8px 12px">保存</button></div>
+</div>
+<div class="form-group">
+<label>系统提示词</label>
+<textarea id="systemPromptInput" rows="2" placeholder="自定义AI行为..."></textarea>
+<button class="btn" onclick="saveSystemPrompt()" style="margin-top:6px">保存</button>
+</div>
+<div class="form-group">
+<label>显示选项</label>
+<div class="checkbox-group"><input type="checkbox" id="showTimerCheck" onchange="toggleDisplay('showTimer')"><label for="showTimerCheck">生成耗时</label></div>
+<div class="checkbox-group"><input type="checkbox" id="showMsgTokensCheck" onchange="toggleDisplay('showMsgTokens')"><label for="showMsgTokensCheck">消息 token</label></div>
+<div class="checkbox-group"><input type="checkbox" id="showTotalTokensCheck" onchange="toggleDisplay('showTotalTokens')"><label for="showTotalTokensCheck">总 token</label></div>
+</div>
+
+<hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+<div class="section-title">导出称呼设置</div>
+<div class="form-group">
+<label>用户称呼</label>
+<input type="text" id="exportUserName" placeholder="用户" value="">
+<button class="btn" onclick="saveExportUserName()" style="margin-top:6px">保存</button>
+</div>
+<div class="form-group">
+<div class="checkbox-group"><input type="checkbox" id="customModelNamesCheck" onchange="toggleCustomModelNames()"><label for="customModelNamesCheck">自定义模型称呼</label></div>
+<div id="modelNamesConfig" style="display:none">
+<div id="modelNamesList"></div>
+</div>
+</div>
+
+<hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+<div class="section-title">已保存的 API</div>
+<div id="savedApiList"></div>
+<hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+<div class="section-title">添加 API</div>
+<div class="form-group"><label>名称</label><input type="text" id="apiName" placeholder="OpenAI"></div>
+<div class="form-group"><label>地址</label><input type="text" id="apiUrl" placeholder="https://api.openai.com/v1"></div>
+<div class="form-group"><label>Key</label><input type="password" id="apiKey" placeholder="sk-..."></div>
+<div class="form-group"><div class="checkbox-group"><input type="checkbox" id="supportsVision" checked><label for="supportsVision">支持图片</label></div></div>
+<button class="btn" onclick="fetchModels()" id="fetchBtn">获取模型</button>
+<div class="model-list" id="modelList" style="display:none"></div>
+<button class="btn" onclick="saveModels()" style="margin-top:8px;display:none" id="saveModelsBtn">保存</button>
+<hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+<div class="section-title">已添加模型</div>
+<div id="addedModelsList"></div>
+</div>
+</div>
+</div>
+
+<!-- Rename Modal -->
+<div class="modal" id="renameModal">
+<div class="modal-content">
+<div class="modal-header"><div class="modal-title">重命名</div><button class="modal-close" onclick="hideRename()">✕</button></div>
+<div class="modal-body">
+<div class="form-group"><input type="text" id="renameInput" placeholder="名称"></div>
+<button class="btn" onclick="confirmRename()">确定</button>
+</div>
+</div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal" id="editModal">
+<div class="modal-content">
+<div class="modal-header"><div class="modal-title">编辑</div><button class="modal-close" onclick="$('editModal').classList.remove('show')">✕</button></div>
+<div class="modal-body">
+<div class="form-group"><textarea id="editInput" rows="4"></textarea></div>
+<div style="display:flex;gap:8px">
+<button class="btn btn-outline" style="flex:1" onclick="confirmEdit(false)">保存</button>
+<button class="btn" style="flex:1" onclick="confirmEdit(true)">保存并重发</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal" id="exportModal">
+<div class="modal-content">
+<div class="modal-header"><div class="modal-title">导出聊天记录</div><button class="modal-close" onclick="hideExportModal()">✕</button></div>
+<div class="modal-body">
+<div style="display:flex;gap:8px;margin-bottom:8px">
+<button class="btn btn-outline" style="flex:1" onclick="exportSelectAll()">全选</button>
+<button class="btn btn-outline" style="flex:1" onclick="exportDeselectAll()">取消全选</button>
+</div>
+<div class="export-select-list" id="exportSelectList"></div>
+<div class="export-btns">
+<button class="btn btn-outline" onclick="exportToClipboard()">📋 复制</button>
+<button class="btn btn-outline" onclick="exportToFile('txt')">TXT</button>
+<button class="btn" onclick="exportToFile('docx')">DOCX</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Code Export Dropdown (reusable) -->
+<div class="modal" id="codeExportModal">
+<div class="modal-content" style="max-width:300px">
+<div class="modal-header"><div class="modal-title">导出代码</div><button class="modal-close" onclick="$('codeExportModal').classList.remove('show')">✕</button></div>
+<div class="modal-body" id="codeExportBody"></div>
+</div>
+</div>
+
+<div class="preview-modal" id="previewModal">
+<button class="close-btn" onclick="closePreview()">✕</button>
+<img id="previewImage" src="" style="display:none">
+<div class="file-content" id="previewFile" style="display:none"><pre id="previewFileContent"></pre></div>
+</div>
+
+<!-- HTML Runner Modal -->
+<div class="preview-modal" id="htmlRunnerModal">
+<button class="close-btn" onclick="$('htmlRunnerModal').classList.remove('show')">✕</button>
+<div class="file-content" style="width:95%;max-width:900px;max-height:90vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
+<div class="html-runner-header"><span>HTML 预览</span></div>
+<iframe id="htmlRunnerFrame" style="flex:1;min-height:400px"></iframe>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+if(typeof pdfjsLib!=='undefined')pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+marked.setOptions({highlight:(code,lang)=>{try{if(lang&&hljs.getLanguage(lang))return hljs.highlight(code,{language:lang}).value;return hljs.highlightAuto(code).value}catch(e){return code}},breaks:true});
+
+let models=JSON.parse(localStorage.getItem('models')||'[]');
+let currentModelId=localStorage.getItem('currentModel')||'';
+let histories=JSON.parse(localStorage.getItem('histories')||'[]');
+let currentHistoryId=null,messages=[],isStreaming=false,abortController=null,fetchedModels=[];
+let renamingId=null,editingMsgIndex=-1;
+let savedApis=JSON.parse(localStorage.getItem('savedApis')||'[]');
+let useCustomTitle=JSON.parse(localStorage.getItem('useCustomTitle')||'false');
+let customTitle=localStorage.getItem('customTitle')||'AI 助手';
+let customSystemPrompt=localStorage.getItem('customSystemPrompt')||'';
+let showTimer=JSON.parse(localStorage.getItem('showTimer')?? 'true');
+let showMsgTokens=JSON.parse(localStorage.getItem('showMsgTokens')?? 'true');
+let showTotalTokens=JSON.parse(localStorage.getItem('showTotalTokens')?? 'true');
+let streamStartTime=null,timerInterval=null;
+let attachedFiles=[];
+let previewFileData={};
+let processingFiles=0;
+let exportUserName=localStorage.getItem('exportUserName')||'用户';
+let useCustomModelNames=JSON.parse(localStorage.getItem('useCustomModelNames')||'false');
+let customModelNames=JSON.parse(localStorage.getItem('customModelNames')||'{}');
+let exportingHistoryId=null;
+
+function $(id){return document.getElementById(id)}
+function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),2500)}
+function esc(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML}
+function estimateTokens(text){if(!text)return 0;const cjk=(text.match(/[\u4e00-\u9fa5]/g)||[]).length;const words=(text.match(/[a-zA-Z0-9]+/g)||[]).length;return Math.ceil(cjk*1.5+words*1.2+(text.length-cjk-words)*0.5)}
+function formatTokenCount(n){return n<10000?n:(n/1000).toFixed(1)+'k'}
+function updateInputTokens(){
+  const text=$('input').value;const inputTokens=estimateTokens(text);let total=inputTokens;
+  messages.forEach(m=>{const v=m.versions[m.current];total+=v?.tokens||0});
+  $('tokenDisplay').textContent=showTotalTokens?formatTokenCount(total)+'t':formatTokenCount(inputTokens)+'t';
+}
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,200)+'px'}
+
+// File parsing
+async function parsePDF(arrayBuffer){try{const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;let text='';for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);const content=await page.getTextContent();text+=content.items.map(item=>item.str).join(' ')+'\n\n';}return text.trim()||'[PDF 无法提取文本]'}catch(e){return '[PDF 解析失败: '+e.message+']'}}
+async function parseWord(arrayBuffer){try{const result=await mammoth.extractRawText({arrayBuffer});return result.value.trim()||'[Word 文档为空]'}catch(e){return '[Word 解析失败: '+e.message+']'}}
+async function parseExcel(arrayBuffer){try{const workbook=XLSX.read(arrayBuffer,{type:'array'});let text='';workbook.SheetNames.forEach(name=>{text+='=== '+name+' ===\n';const sheet=workbook.Sheets[name];text+=XLSX.utils.sheet_to_csv(sheet)+'\n\n'});return text.trim()||'[Excel 为空]'}catch(e){return '[Excel 解析失败: '+e.message+']'}}
+async function parsePPT(arrayBuffer){try{const zip=await JSZip.loadAsync(arrayBuffer);let text='';const slideFiles=Object.keys(zip.files).filter(f=>f.match(/ppt\/slides\/slide\d+\.xml/)).sort();for(const file of slideFiles){const content=await zip.file(file).async('string');const matches=content.match(/<a:t>([^<]*)<\/a:t>/g)||[];const slideText=matches.map(m=>m.replace(/<\/?a:t>/g,'')).join(' ');if(slideText)text+=slideText+'\n\n'}return text.trim()||'[PPT 无法提取文本]'}catch(e){return '[PPT 解析失败: '+e.message+']'}}
+
+async function handleFiles(files){
+  for(let f of files){
+    if(f.size>20*1024*1024){toast('文件过大(最大 20MB)');continue}
+    const fileIndex=attachedFiles.length;
+    const ext=f.name.split('.').pop().toLowerCase();
+    attachedFiles.push({name:f.name,type:f.type,data:'',loading:true});
+    processingFiles++;renderFilePreview();
+    try{
+      if(f.type.startsWith('image/')){const reader=new FileReader();reader.onload=e=>{attachedFiles[fileIndex].data=e.target.result;attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()};reader.readAsDataURL(f)}
+      else if(ext==='pdf'){const ab=await f.arrayBuffer();const text=await parsePDF(ab);attachedFiles[fileIndex].data=text;attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()}
+      else if(ext==='docx'){const ab=await f.arrayBuffer();const text=await parseWord(ab);attachedFiles[fileIndex].data=text;attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()}
+      else if(ext==='doc'){attachedFiles[fileIndex].data='[.doc 格式不支持，请转换为 .docx]';attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()}
+      else if(ext==='xlsx'||ext==='xls'){const ab=await f.arrayBuffer();const text=await parseExcel(ab);attachedFiles[fileIndex].data=text;attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()}
+      else if(ext==='pptx'){const ab=await f.arrayBuffer();const text=await parsePPT(ab);attachedFiles[fileIndex].data=text;attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()}
+      else if(ext==='ppt'){attachedFiles[fileIndex].data='[.ppt 格式不支持，请转换为 .pptx]';attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()}
+      else{const reader=new FileReader();reader.onload=e=>{attachedFiles[fileIndex].data=e.target.result;attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()};reader.readAsText(f)}
+    }catch(e){attachedFiles[fileIndex].data='[解析失败: '+e.message+']';attachedFiles[fileIndex].loading=false;processingFiles--;renderFilePreview()}
+  }
+}
+function renderFilePreview(){
+  $('filePreview').innerHTML=attachedFiles.map((f,i)=>{
+    const isImage=f.type.startsWith('image/');const loadingHtml=f.loading?'<span class="loading-text">解析中...</span>':'';
+    if(isImage&&f.data)return`<div class="file-item ${f.loading?'loading':''}"><img src="${f.data}">${loadingHtml}<span class="remove" onclick="removeFile(${i})">✕</span></div>`;
+    return`<div class="file-item ${f.loading?'loading':''}"><span class="name">${esc(f.name)}</span>${loadingHtml}<span class="remove" onclick="removeFile(${i})">✕</span></div>`;
+  }).join('');
+}
+function removeFile(i){attachedFiles.splice(i,1);renderFilePreview()}
+function showImagePreview(src){$('previewImage').src=src;$('previewImage').style.display='block';$('previewFile').style.display='none';$('previewModal').classList.add('show')}
+function showFilePreview(content){$('previewFileContent').textContent=content;$('previewFile').style.display='block';$('previewImage').style.display='none';$('previewModal').classList.add('show')}
+function closePreview(){$('previewModal').classList.remove('show')}
+
+function toggleModelDropdown(){$('modelDropdown').classList.toggle('show')}
+function updateModelDropdown(){
+  const d=$('modelDropdown');
+  if(!models.length){d.innerHTML='<div class="model-item">暂无模型</div>';return}
+  d.innerHTML=models.map(m=>`<div class="model-item ${m.id===currentModelId?'active':''}" onclick="selectModel('${m.id}')">${esc(m.name)} <span style="color:var(--text2)">(${esc(m.apiName)})</span>${m.supportsVision?' 🖼️':''}</div>`).join('');
+}
+function selectModel(id){currentModelId=id;localStorage.setItem('currentModel',id);updateModelDropdown();toggleModelDropdown()}
+function getCurrentModel(){return models.find(m=>m.id===currentModelId)}
+function updatePageTitle(){const t=useCustomTitle&&customTitle?customTitle:'AI 助手';document.title=t;$('logoText').textContent=t;$('welcomeText').textContent='我是 '+t+'，可以帮你回答问题、写代码、分析数据等。'}
+
+function showSettings(){
+  $('settingsModal').classList.add('show');
+  $('customTitleCheck').checked=useCustomTitle;$('customTitleInput').value=customTitle;$('customTitleInput').disabled=!useCustomTitle;
+  $('systemPromptInput').value=customSystemPrompt;
+  $('showTimerCheck').checked=showTimer;$('showMsgTokensCheck').checked=showMsgTokens;$('showTotalTokensCheck').checked=showTotalTokens;
+  $('exportUserName').value=exportUserName;
+  $('customModelNamesCheck').checked=useCustomModelNames;
+  renderModelNamesConfig();
+  if(useCustomModelNames)$('modelNamesConfig').style.display='block';else $('modelNamesConfig').style.display='none';
+  renderAddedModels();renderSavedApis();
+}
+function hideSettings(){$('settingsModal').classList.remove('show')}
+function toggleCustomTitle(){useCustomTitle=$('customTitleCheck').checked;$('customTitleInput').disabled=!useCustomTitle;localStorage.setItem('useCustomTitle',JSON.stringify(useCustomTitle));if(!useCustomTitle)updatePageTitle()}
+function saveCustomTitle(){customTitle=$('customTitleInput').value.trim()||'AI 助手';localStorage.setItem('customTitle',customTitle);updatePageTitle();toast('已保存')}
+function saveSystemPrompt(){customSystemPrompt=$('systemPromptInput').value;localStorage.setItem('customSystemPrompt',customSystemPrompt);toast('已保存')}
+function toggleDisplay(k){const v=$(k+'Check').checked;if(k==='showTimer')showTimer=v;else if(k==='showMsgTokens')showMsgTokens=v;else showTotalTokens=v;localStorage.setItem(k,JSON.stringify(v));if(messages.length)renderChat();updateInputTokens()}
+function saveExportUserName(){exportUserName=$('exportUserName').value.trim()||'用户';localStorage.setItem('exportUserName',exportUserName);toast('已保存')}
+function toggleCustomModelNames(){useCustomModelNames=$('customModelNamesCheck').checked;localStorage.setItem('useCustomModelNames',JSON.stringify(useCustomModelNames));$('modelNamesConfig').style.display=useCustomModelNames?'block':'none';if(useCustomModelNames)renderModelNamesConfig()}
+function renderModelNamesConfig(){
+  const el=$('modelNamesList');
+  if(!models.length){el.innerHTML='<div style="color:var(--text2);font-size:12px">暂无模型</div>';return}
+  el.innerHTML=models.map(m=>`<div class="custom-name-item"><label>${esc(m.name)}</label><input type="text" placeholder="自定义称呼" value="${esc(customModelNames[m.id]||'')}" onchange="saveModelCustomName('${m.id}',this.value)" style="margin-top:4px;padding:4px 8px;font-size:12px"></div>`).join('');
+}
+function saveModelCustomName(modelId,name){
+  if(name.trim())customModelNames[modelId]=name.trim();else delete customModelNames[modelId];
+  localStorage.setItem('customModelNames',JSON.stringify(customModelNames));
+}
+function getExportModelName(modelId){
+  if(useCustomModelNames&&customModelNames[modelId])return customModelNames[modelId];
+  const m=models.find(x=>x.id===modelId);return m?m.name:'AI';
+}
+
+async function fetchModels(){
+  const n=$('apiName').value.trim(),u=$('apiUrl').value.trim(),k=$('apiKey').value.trim();
+  if(!n||!u){toast('请填写');return}
+  const ml=$('modelList'),fb=$('fetchBtn');ml.style.display='block';ml.innerHTML='<div class="model-check-item">连接中...</div>';fb.disabled=true;
+  try{
+    const h={'Content-Type':'application/json'};if(k)h['Authorization']='Bearer '+k;
+    const r=await fetch(u.replace(/\/$/,'')+'/models',{headers:h});if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();const md=d.data||d.models||d||[];if(!md.length)throw new Error('空');
+    fetchedModels=md.map(m=>({id:m.id||m.name||m,name:m.id||m.name||m,apiName:n,apiUrl:u,apiKey:k,supportsVision:$('supportsVision').checked}));
+    ml.innerHTML=fetchedModels.map((m,i)=>`<div class="model-check-item"><input type="checkbox" id="m_${i}" value="${i}"><label for="m_${i}">${esc(m.name)}</label></div>`).join('');
+    $('saveModelsBtn').style.display='block';
+  }catch(e){
+    ml.innerHTML=`<div style="padding:10px"><div style="color:#c0392b;margin-bottom:6px">${esc(e.message)}</div><div style="display:flex;gap:6px"><input id="manualModelId" placeholder="模型 ID" style="flex:1;padding:6px;border:1px solid var(--border);border-radius:4px"><button class="btn" style="width:auto;padding:6px 10px" onclick="addManualModel()">添加</button></div></div>`;
+  }finally{fb.disabled=false}
+}
+function addManualModel(){
+  const id=$('manualModelId').value.trim();if(!id)return;
+  const n=$('apiName').value.trim(),u=$('apiUrl').value.trim(),k=$('apiKey').value.trim();
+  fetchedModels=[{id,name:id,apiName:n,apiUrl:u,apiKey:k,supportsVision:$('supportsVision').checked}];
+  $('modelList').innerHTML=`<div class="model-check-item"><input type="checkbox" id="m_0" value="0" checked><label for="m_0">${esc(id)}</label></div>`;
+  saveModels();
+}
+function saveModels(){
+  const cbs=$('modelList').querySelectorAll('input:checked');if(!cbs.length){toast('请选择');return}
+  const n=$('apiName').value.trim(),u=$('apiUrl').value.trim(),k=$('apiKey').value.trim(),sv=$('supportsVision').checked;
+  if(!savedApis.find(a=>a.url===u)){savedApis.push({name:n,url:u,key:k,supportsVision:sv});localStorage.setItem('savedApis',JSON.stringify(savedApis))}
+  let a=0;cbs.forEach(cb=>{const m=fetchedModels[cb.value];const uid=m.apiUrl+'|'+m.id;if(!models.find(x=>x.id===uid)){models.push({id:uid,name:m.name,apiName:m.apiName,apiUrl:m.apiUrl,apiKey:m.apiKey,modelId:m.id,supportsVision:m.supportsVision});a++}});
+  if(a>0){localStorage.setItem('models',JSON.stringify(models));updateModelDropdown();renderAddedModels();renderSavedApis();toast('已添加');if(!currentModelId&&models.length)selectModel(models[0].id);$('apiName').value='';$('apiUrl').value='';$('apiKey').value='';$('modelList').style.display='none';$('saveModelsBtn').style.display='none'}
+}
+function renderAddedModels(){
+  const l=$('addedModelsList');
+  if(!models.length){l.innerHTML='<div style="color:var(--text2);font-size:12px">暂无</div>';return}
+  const groups={};models.forEach(m=>{if(!groups[m.apiName])groups[m.apiName]=[];groups[m.apiName].push(m)});
+  l.innerHTML=Object.keys(groups).map(apiName=>`<div class="api-group"><div class="api-group-title">${esc(apiName)}</div>${groups[apiName].map(m=>`<div class="added-model-item"><div class="model-name">${esc(m.name)}${m.supportsVision?' 🖼️':''}</div><button class="del-btn" onclick="deleteModel('${m.id}')">删除</button></div>`).join('')}</div>`).join('');
+}
+function deleteModel(id){models=models.filter(m=>m.id!==id);localStorage.setItem('models',JSON.stringify(models));if(currentModelId===id){currentModelId=models[0]?.id||'';localStorage.setItem('currentModel',currentModelId)}updateModelDropdown();renderAddedModels()}
+function renderSavedApis(){
+  const l=$('savedApiList');
+  if(!savedApis.length){l.innerHTML='<div style="color:var(--text2);font-size:12px">暂无</div>';return}
+  l.innerHTML=savedApis.map((a,i)=>`<div class="added-model-item"><div class="model-name">${esc(a.name)}${a.supportsVision?' 🖼️':''}</div><div style="display:flex;gap:4px"><button class="use-btn" onclick="loadApi(${i})">使用</button><button class="del-btn" onclick="deleteApi(${i})">删除</button></div></div>`).join('');
+}
+function loadApi(i){const a=savedApis[i];$('apiName').value=a.name;$('apiUrl').value=a.url;$('apiKey').value=a.key||'';$('supportsVision').checked=a.supportsVision||false}
+function deleteApi(i){savedApis.splice(i,1);localStorage.setItem('savedApis',JSON.stringify(savedApis));renderSavedApis()}
+
+function toggleSidebar(){$('sidebar').classList.toggle('show');document.querySelector('.sidebar-overlay').classList.toggle('show')}
+function getTimeGroup(timestamp){
+  if(!timestamp)return'更早';const now=new Date();const date=new Date(timestamp);
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const yesterday=new Date(today);yesterday.setDate(yesterday.getDate()-1);
+  const weekAgo=new Date(today);weekAgo.setDate(weekAgo.getDate()-7);
+  const monthAgo=new Date(today);monthAgo.setDate(monthAgo.getDate()-30);
+  if(date>=today)return'今天';if(date>=yesterday)return'昨天';if(date>=weekAgo)return'最近 7 天';if(date>=monthAgo)return'最近 30 天';return'更早';
+}
+function formatTime(timestamp){if(!timestamp)return'';const d=new Date(timestamp);return d.toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+function updateHistoryList(){
+  const l=$('historyList');
+  if(!histories.length){l.innerHTML='<div style="padding:20px;text-align:center;color:var(--text2)">暂无</div>';return}
+  const groups={'今天':[],'昨天':[],'最近 7 天':[],'最近 30 天':[],'更早':[]};
+  histories.forEach(h=>{const g=getTimeGroup(h.updatedAt||h.createdAt);if(groups[g])groups[g].push(h)});
+  let html='';
+  for(const g of['今天','昨天','最近 7 天','最近 30 天','更早']){
+    if(groups[g]&&groups[g].length){
+      html+=`<div class="history-group-title">${g}</div>`;
+      html+=groups[g].map(h=>`<div class="history-item ${h.id===currentHistoryId?'active':''}" onclick="loadHistory('${h.id}')"><div class="history-info"><div class="history-title">${esc(h.title||'未命名')}</div><div class="history-time">${formatTime(h.updatedAt||h.createdAt)}</div></div><div class="history-menu-btn" onclick="event.stopPropagation();toggleHistoryMenu('${h.id}')">⋮</div><div class="history-menu" id="menu_${h.id}"><div class="history-menu-item" onclick="event.stopPropagation();showRename('${h.id}')">重命名</div><div class="history-menu-item" onclick="event.stopPropagation();showExportModal('${h.id}')">导出</div><div class="history-menu-item" onclick="event.stopPropagation();deleteHistory('${h.id}')">删除</div></div></div>`).join('');
+    }
+  }
+  l.innerHTML=html||'<div style="padding:20px;text-align:center;color:var(--text2)">暂无</div>';
+}
+function toggleHistoryMenu(id){const m=$('menu_'+id);document.querySelectorAll('.history-menu').forEach(x=>{if(x!==m)x.classList.remove('show')});m.classList.toggle('show')}
+function loadHistory(id){
+  const h=histories.find(x=>x.id===id);if(!h){toast('记录不存在');return}
+  currentHistoryId=id;try{messages=JSON.parse(JSON.stringify(h.messages||[]))}catch(e){messages=[];toast('加载失败')}
+  renderChat();updateHistoryList();toggleSidebar();
+}
+function deleteHistory(id){histories=histories.filter(h=>h.id!==id);localStorage.setItem('histories',JSON.stringify(histories));if(currentHistoryId===id)newChat();updateHistoryList()}
+function showRename(id){renamingId=id;const h=histories.find(x=>x.id===id);$('renameInput').value=h?.title||'';$('renameModal').classList.add('show')}
+function hideRename(){$('renameModal').classList.remove('show')}
+function confirmRename(){const t=$('renameInput').value.trim();if(!t)return;const h=histories.find(x=>x.id===renamingId);if(h){h.title=t;localStorage.setItem('histories',JSON.stringify(histories));updateHistoryList()}hideRename()}
+
+function saveCurrentHistory(){
+  if(!messages.length)return;
+  let h=histories.find(x=>x.id===currentHistoryId);const now=Date.now();
+  if(!h){currentHistoryId=now.toString();const first=messages[0]?.versions?.[0]?.content||'';h={id:currentHistoryId,title:first.slice(0,20)||'新对话',messages:[],createdAt:now,updatedAt:now};histories.unshift(h)}
+  h.messages=JSON.parse(JSON.stringify(messages));h.updatedAt=now;
+  histories.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  localStorage.setItem('histories',JSON.stringify(histories));updateHistoryList();
+}
+function newChat(){currentHistoryId=null;messages=[];attachedFiles=[];renderFilePreview();$('chat').innerHTML='';$('chat').style.display='none';$('welcome').style.display='flex';updateHistoryList();updateInputTokens()}
+function switchVersion(i,dir){const m=messages[i];if((dir===-1&&m.current>0)||(dir===1&&m.current<m.versions.length-1)){m.current+=dir;renderChat();saveCurrentHistory()}}
+function editMessage(i){$('editInput').value=messages[i].versions[messages[i].current].content;editingMsgIndex=i;$('editModal').classList.add('show')}
+function confirmEdit(regen){
+  const c=$('editInput').value.trim();if(!c)return;
+  const m=messages[editingMsgIndex];m.versions.push({content:c,tokens:estimateTokens(c)});m.current=m.versions.length-1;
+  $('editModal').classList.remove('show');
+  if(regen){messages=messages.slice(0,editingMsgIndex+1);renderChat();sendMessage(true)}
+  else{renderChat();saveCurrentHistory();toast('已保存')}
+}
+function regenerateMessage(i){const m=messages[i];if(m.role==='assistant'){m.versions.push({content:'',tokens:0});m.current=m.versions.length-1;messages=messages.slice(0,i+1);sendMessage(true,i)}}
+function getModelDisplayName(modelId){const m=models.find(x=>x.id===modelId);return m?m.name:'AI'}
+
+function renderMarkdown(text){
+  try{
+    text=(text||'').replace(/\$\$([\s\S]+?)\$\$/g,(m,c)=>{try{return katex.renderToString(c,{displayMode:true,throwOnError:false})}catch(e){return m}}).replace(/\$(.+?)\$/g,(m,c)=>{try{return katex.renderToString(c,{displayMode:false,throwOnError:false})}catch(e){return m}});
+    return marked.parse(text);
+  }catch(e){return text||''}
+}
+
+function renderChat(){
+  $('welcome').style.display='none';$('chat').style.display='block';
+  const chat=$('chat');previewFileData={};
+  chat.innerHTML=messages.map((m,i)=>{
+    const isUser=m.role==='user';
+    const ver=m.versions?.[m.current]||{content:'',tokens:0};
+    // Both user and assistant messages render markdown+latex
+    const content=renderMarkdown(ver.content||'');
+    const avatar=isUser?'<svg viewBox="0 0 24 24" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>':'<svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>';
+    const vLen=m.versions?.length||1;
+    let vNav='';if(vLen>1)vNav=`<div class="version-control"><span class="vc-btn ${m.current===0?'disabled':''}" onclick="switchVersion(${i},-1)">&lt;</span><span>${m.current+1}/${vLen}</span><span class="vc-btn ${m.current===vLen-1?'disabled':''}" onclick="switchVersion(${i},1)">&gt;</span></div>`;
+    const copyIcon=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    let tools=isUser?`<span class="tool-btn" onclick="copyMessageRich(${i})">${copyIcon}</span><span class="tool-btn" onclick="editMessage(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>`:`<span class="tool-btn" onclick="copyMessageRich(${i})">${copyIcon}</span><span class="tool-btn" onclick="regenerateMessage(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>`;
+    let stats='';
+    if(showMsgTokens||showTimer){let p=[];if(showMsgTokens)p.push((ver.tokens||0)+'t');if(showTimer&&ver.time!==undefined)p.push(ver.time+'s');if(p.length)stats=`<span id="stats_${i}" style="font-size:10px;opacity:.7;font-family:monospace">${p.join(' · ')}</span>`}
+    let filesHtml='';
+    if(ver.files?.length){
+      filesHtml='<div class="msg-files">';
+      ver.files.forEach((f,fi)=>{const fileKey=`${i}_${fi}`;if(f.type?.startsWith('image/')){previewFileData[fileKey]=f.data;filesHtml+=`<img src="${f.data}" onclick="showImagePreview(previewFileData['${fileKey}'])">`}else{previewFileData[fileKey]=f.data;filesHtml+=`<div class="file-tag" onclick="showFilePreview(previewFileData['${fileKey}'])"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>${esc(f.name)}</div>`}});
+      filesHtml+='</div>';
+    }
+    const modelName=!isUser&&m.modelId?getModelDisplayName(m.modelId):'';
+    const headerHtml=isUser?`<div class="msg-header" style="justify-content:flex-end"><div class="avatar">${avatar}</div></div>`:`<div class="msg-header"><div class="avatar">${avatar}</div>${modelName?`<span class="model-name">${esc(modelName)}</span>`:''}</div>`;
+    return`<div class="msg ${isUser?'user':'assistant'}">${headerHtml}<div class="msg-content"><div class="bubble">${filesHtml}${content}</div><div class="msg-footer">${vNav}<div class="msg-tools">${tools}</div>${stats}</div></div></div>`;
+  }).join('');
+  chat.scrollTop=chat.scrollHeight;
+  // Post-process code blocks
+  chat.querySelectorAll('pre code').forEach(block=>{
+    const pre=block.parentElement;if(pre.querySelector('.code-header'))return;
+    const lang=block.className.match(/language-(\w+)/)?.[1]||'';
+    const codeText=block.textContent;
+    const h=document.createElement('div');h.className='code-header';
+    let exportOptions=`<button class="code-btn" onclick="exportCodeToFile(this,'txt')" title="导出 TXT"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`;
+    if(lang==='markdown'||lang==='md')exportOptions+=`<button class="code-btn" onclick="exportCodeToFile(this,'md')" title="导出 MD"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`;
+    if(lang==='python'||lang==='py')exportOptions+=`<button class="code-btn" onclick="exportCodeToFile(this,'py')" title="导出 PY"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`;
+    if(lang==='html')exportOptions+=`<button class="code-btn" onclick="exportCodeToFile(this,'html')" title="导出 HTML"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button class="code-btn" onclick="runHTML(this)" title="运行 HTML"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/></svg></button>`;
+    if(lang==='javascript'||lang==='js')exportOptions+=`<button class="code-btn" onclick="exportCodeToFile(this,'js')" title="导出 JS"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`;
+    if(lang==='css')exportOptions+=`<button class="code-btn" onclick="exportCodeToFile(this,'css')" title="导出 CSS"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`;
+    if(lang==='java')exportOptions+=`<button class="code-btn" onclick="exportCodeToFile(this,'java')" title="导出 Java"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`;
+    if(lang==='c'||lang==='cpp')exportOptions+=`<button class="code-btn" onclick="exportCodeToFile(this,'${lang}')" title="导出"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>`;
+
+    h.innerHTML=`<span class="code-lang">${lang||'code'}</span><div class="code-header-btns"><button class="code-btn" onclick="copyCode(this)" title="复制">${copyIcon}</button>${exportOptions}</div>`;
+    pre.insertBefore(h,block);pre.setAttribute('data-code',codeText);
+  });
+  updateInputTokens();
+}
+
+const copyIcon=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:14px;height:14px;stroke-width:2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+
+function copyCode(btn){
+  const pre=btn.closest('pre');
+  navigator.clipboard.writeText(pre.getAttribute('data-code')).then(()=>{toast('已复制')});
+}
+
+function exportCodeToFile(btn,ext){
+  const pre=btn.closest('pre');const code=pre.getAttribute('data-code');
+  const blob=new Blob([code],{type:'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='code.'+ext;a.click();URL.revokeObjectURL(a.href);
+  toast('已导出');
+}
+
+function runHTML(btn){
+  const pre=btn.closest('pre');const code=pre.getAttribute('data-code');
+  $('htmlRunnerFrame').srcdoc=code;
+  $('htmlRunnerModal').classList.add('show');
+}
+
+// Rich copy: copies both plain text and HTML to clipboard
+function copyMessageRich(i){
+  const ver=messages[i]?.versions?.[messages[i].current];if(!ver)return;
+  const rawContent=ver.content||'';
+  const plainText=stripMarkdown(rawContent);
+  const htmlContent=renderMarkdown(rawContent);
+  copyRichText(plainText,htmlContent);
+}
+
+function stripMarkdown(text){
+  // Remove markdown formatting for plain text
+  let t=text;
+  // Remove LaTeX
+  t=t.replace(/\$\$([\s\S]+?)\$\$/g,'$1').replace(/\$(.+?)\$/g,'$1');
+  // Remove headers
+  t=t.replace(/^#{1,6}\s+/gm,'');
+  // Remove bold/italic
+  t=t.replace(/\*\*\*(.+?)\*\*\*/g,'$1').replace(/\*\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1');
+  t=t.replace(/___(.+?)___/g,'$1').replace(/__(.+?)__/g,'$1').replace(/_(.+?)_/g,'$1');
+  // Remove links
+  t=t.replace(/\[([^\]]+)\]\([^)]+\)/g,'$1');
+  // Remove images
+  t=t.replace(/!\[([^\]]*)\]\([^)]+\)/g,'$1');
+  // Remove code blocks
+  t=t.replace(/```[\s\S]*?```/g,m=>{return m.replace(/```\w*\n?/g,'').replace(/```/g,'')});
+  // Remove inline code
+  t=t.replace(/`([^`]+)`/g,'$1');
+  // Remove horizontal rules
+  t=t.replace(/^[-*_]{3,}\s*$/gm,'');
+  // Remove blockquotes
+  t=t.replace(/^>\s+/gm,'');
+  return t;
+}
+
+function copyRichText(plainText,htmlContent){
+  // Use Clipboard API to write both formats
+  try{
+    const htmlBlob=new Blob([htmlContent],{type:'text/html'});
+    const textBlob=new Blob([plainText],{type:'text/plain'});
+    const clipboardItem=new ClipboardItem({'text/html':htmlBlob,'text/plain':textBlob});
+    navigator.clipboard.write([clipboardItem]).then(()=>toast('已复制'));
+  }catch(e){
+    // Fallback
+    navigator.clipboard.writeText(plainText).then(()=>toast('已复制'));
+  }
+}
+
+function updateLiveStats(idx,tokens,elapsed){const el=$('stats_'+idx);if(!el)return;let p=[];if(showMsgTokens)p.push(tokens+'t');if(showTimer)p.push(elapsed+'s');el.textContent=p.join(' · ')}
+function updateSendButton(){if(isStreaming){$('sendIcon').style.display='none';$('stopIcon').style.display='block'}else{$('sendIcon').style.display='block';$('stopIcon').style.display='none'}}
+function handleSendClick(){if(isStreaming){if(abortController)abortController.abort();isStreaming=false;updateSendButton()}else sendMessage()}
+function sendSuggestion(t){$('input').value=t;autoResize($('input'));updateInputTokens();sendMessage()}
+
+function copyMessage(i){navigator.clipboard.writeText(messages[i]?.versions?.[messages[i].current]?.content||'').then(()=>toast('已复制'))}
+
+// Export modal
+function showExportModal(historyId){
+  exportingHistoryId=historyId;
+  const h=histories.find(x=>x.id===historyId);
+  if(!h||!h.messages?.length){toast('无消息可导出');return}
+  document.querySelectorAll('.history-menu').forEach(m=>m.classList.remove('show'));
+  const list=$('exportSelectList');
+  list.innerHTML=h.messages.map((m,i)=>{
+    const ver=m.versions?.[m.current]||{content:''};
+    const preview=(ver.content||'').slice(0,50).replace(/\n/g,' ');
+    const roleLabel=m.role==='user'?'用户':'AI';
+    const roleClass=m.role==='user'?'user':'assistant';
+    return`<div class="export-msg-item"><input type="checkbox" checked data-idx="${i}"><span class="role-tag ${roleClass}">${roleLabel}</span><span class="msg-preview">${esc(preview)}</span></div>`;
+  }).join('');
+  $('exportModal').classList.add('show');
+}
+function hideExportModal(){$('exportModal').classList.remove('show')}
+function exportSelectAll(){$('exportSelectList').querySelectorAll('input').forEach(cb=>cb.checked=true)}
+function exportDeselectAll(){$('exportSelectList').querySelectorAll('input').forEach(cb=>cb.checked=false)}
+
+function getExportTitle(historyId){
+  const h=histories.find(x=>x.id===historyId);if(!h)return'对话';
+  if(h.title&&h.title!=='新对话')return h.title;
+  const first=h.messages?.[0]?.versions?.[0]?.content||'';
+  return first.slice(0,10)||'对话';
+}
+
+function getSelectedExportMessages(){
+  const h=histories.find(x=>x.id===exportingHistoryId);if(!h)return[];
+  const checked=[];
+  $('exportSelectList').querySelectorAll('input:checked').forEach(cb=>{checked.push(parseInt(cb.dataset.idx))});
+  return checked.map(i=>h.messages[i]).filter(Boolean);
+}
+
+function buildExportPlainText(msgs,title){
+  let lines=[title,''];
+  msgs.forEach(m=>{
+    const ver=m.versions?.[m.current]||{content:''};
+    const content=stripMarkdown(ver.content||'');
+    if(m.role==='user'){
+      lines.push(exportUserName+'：'+content);
+    }else{
+      const name=getExportModelName(m.modelId);
+      lines.push(name+'：'+content);
+    }
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+function buildExportHTML(msgs,title){
+  let html=`<h1>${esc(title)}</h1>`;
+  msgs.forEach(m=>{
+    const ver=m.versions?.[m.current]||{content:''};
+    const content=renderMarkdown(ver.content||'');
+    if(m.role==='user'){
+      html+=`<p><strong>${esc(exportUserName)}：</strong></p>${content}`;
+    }else{
+      const name=getExportModelName(m.modelId);
+      html+=`<p><strong>${esc(name)}：</strong></p>${content}`;
+    }
+    html+='<hr>';
+  });
+  return html;
+}
+
+function exportToClipboard(){
+  const msgs=getSelectedExportMessages();if(!msgs.length){toast('请选择消息');return}
+  const title=getExportTitle(exportingHistoryId);
+  const plainText=buildExportPlainText(msgs,title);
+  const htmlContent=buildExportHTML(msgs,title);
+  copyRichText(plainText,htmlContent);
+  hideExportModal();
+}
+
+function exportToFile(format){
+  const msgs=getSelectedExportMessages();if(!msgs.length){toast('请选择消息');return}
+  const title=getExportTitle(exportingHistoryId);
+
+  if(format==='txt'){
+    const text=buildExportPlainText(msgs,title);
+    const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=title+'.txt';a.click();URL.revokeObjectURL(a.href);
+  }else if(format==='docx'){
+    // Build a simple DOCX using HTML conversion via mammoth-reverse or just HTML in a docx wrapper
+    const htmlContent=buildExportDocxHTML(msgs,title);
+    const blob=htmlToDocxBlob(htmlContent,title);
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=title+'.docx';a.click();URL.revokeObjectURL(a.href);
+  }
+  toast('已导出');hideExportModal();
+}
+
+function buildExportDocxHTML(msgs,title){
+  let html='';
+  msgs.forEach(m=>{
+    const ver=m.versions?.[m.current]||{content:''};
+    let content=ver.content||'';
+    // Convert markdown to simple HTML preserving formatting
+    content=renderMarkdown(content);
+    // Strip script tags
+    content=content.replace(/<script[\s\S]*?<\/script>/gi,'');
+    if(m.role==='user'){
+      html+=`<p><b>${esc(exportUserName)}：</b></p>${content}<br>`;
+    }else{
+      const name=getExportModelName(m.modelId);
+      html+=`<p><b>${esc(name)}：</b></p>${content}<br>`;
+    }
+  });
+  return html;
+}
+
+function htmlToDocxBlob(htmlContent,title){
+  // Use Word-compatible HTML wrapped in MHTML-like format
+  const fullHtml=`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:Arial,sans-serif;font-size:14px;line-height:1.6}pre{background:#f5f5f5;padding:10px;border-radius:4px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap}code{font-family:Consolas,monospace}h1{font-size:20px}h2{font-size:18px}h3{font-size:16px}</style></head><body><h1>${esc(title)}</h1>${htmlContent}</body></html>`;
+  return new Blob([fullHtml],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+
+async function sendMessage(isRegen=false,regenIdx=-1){
+  const input=$('input');const text=input.value.trim();
+  if(processingFiles>0){toast('请等待文件解析完成');return}
+  if((!text&&!attachedFiles.length&&!isRegen)||isStreaming)return;
+  const model=getCurrentModel();if(!model){toast('请先选择模型');return}
+  if(attachedFiles.length>0&&attachedFiles.some(f=>f.type?.startsWith('image/'))&&!model.supportsVision){toast('当前模型不支持图片');return}
+  if(!isRegen){messages.push({role:'user',versions:[{content:text,tokens:estimateTokens(text),files:[...attachedFiles]}],current:0,timestamp:Date.now()});input.value='';input.style.height='auto';attachedFiles=[];renderFilePreview()}
+  renderChat();isStreaming=true;updateSendButton();
+  let assistantMsgIndex;
+  if(regenIdx>=0&&messages[regenIdx]?.role==='assistant'){assistantMsgIndex=regenIdx;messages[assistantMsgIndex].modelId=model.id}
+  else{messages.push({role:'assistant',versions:[{content:'',tokens:0}],current:0,timestamp:Date.now(),modelId:model.id});assistantMsgIndex=messages.length-1}
+  renderChat();let fullContent='';streamStartTime=null;
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  try{
+    const historyMsgs=[];const contextMsgs=messages.slice(Math.max(0,messages.length-1-20),-1);
+    for(const m of contextMsgs){
+      const ver=m.versions?.[m.current];if(!ver)continue;
+      if(m.role==='user'&&ver.files?.length&&model.supportsVision){
+        const content=[{type:'text',text:ver.content||''}];
+        for(const f of ver.files){if(f.type?.startsWith('image/'))content.push({type:'image_url',image_url:{url:f.data}});else content[0].text+='\n\n[附件 '+f.name+']\n'+f.data}
+        historyMsgs.push({role:'user',content});
+      }else if(m.role==='user'&&ver.files?.length){
+        let txt=ver.content||'';for(const f of ver.files)if(!f.type?.startsWith('image/'))txt+='\n\n[附件 '+f.name+']\n'+f.data;
+        historyMsgs.push({role:'user',content:txt});
+      }else{historyMsgs.push({role:m.role,content:ver.content||''})}
+    }
+    abortController=new AbortController();
+    const sysContent='Time: '+new Date().toLocaleString('zh-CN')+(customSystemPrompt?'\n\n'+customSystemPrompt:'');
+    const response=await fetch(model.apiUrl.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',...(model.apiKey?{'Authorization':'Bearer '+model.apiKey}:{})},body:JSON.stringify({model:model.modelId,messages:[{role:'system',content:sysContent},...historyMsgs],stream:true}),signal:abortController.signal});
+    const reader=response.body.getReader();const decoder=new TextDecoder();
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      for(const line of decoder.decode(value).split('\n')){
+        if(line.startsWith('data: ')){
+          const data=line.slice(6);if(data==='[DONE]')continue;
+          try{
+            const json=JSON.parse(data);const content=json.choices?.[0]?.delta?.content;
+            if(content){
+              if(!streamStartTime){streamStartTime=Date.now();timerInterval=setInterval(()=>{if(!streamStartTime)return;const elapsed=Math.round((Date.now()-streamStartTime)/1000);const aiVer=messages[assistantMsgIndex]?.versions?.[messages[assistantMsgIndex].current];if(aiVer)updateLiveStats(assistantMsgIndex,aiVer.tokens||0,elapsed)},500)}
+              fullContent+=content;
+              const aiVer=messages[assistantMsgIndex].versions[messages[assistantMsgIndex].current];
+              aiVer.content=fullContent;aiVer.tokens=estimateTokens(fullContent);
+              const bubbles=document.querySelectorAll('.bubble');
+              if(bubbles.length)bubbles[bubbles.length-1].innerHTML=renderMarkdown(fullContent)+'<span class="cursor"></span>';
+              updateInputTokens();$('chat').scrollTop=$('chat').scrollHeight;
+            }
+          }catch(e){}
+        }
+      }
+    }
+  }catch(e){if(e.name!=='AbortError'){const aiVer=messages[assistantMsgIndex]?.versions?.[messages[assistantMsgIndex].current];if(aiVer)aiVer.content='错误: '+e.message}}
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  if(streamStartTime){const aiVer=messages[assistantMsgIndex]?.versions?.[messages[assistantMsgIndex].current];if(aiVer)aiVer.time=Math.round((Date.now()-streamStartTime)/1000);streamStartTime=null}
+  isStreaming=false;updateSendButton();renderChat();saveCurrentHistory();abortController=null;
+}
+
+document.addEventListener('click',e=>{if(!e.target.closest('.model-select'))$('modelDropdown').classList.remove('show');if(!e.target.closest('.history-menu-btn')&&!e.target.closest('.history-menu'))document.querySelectorAll('.history-menu').forEach(m=>m.classList.remove('show'))});
+updatePageTitle();updateModelDropdown();updateHistoryList();updateInputTokens();
+</script>
+</body></html>
