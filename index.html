@@ -680,25 +680,27 @@
 
       <script>
         // ==================== 先注册标签切换事件 ====================
-document.querySelectorAll('.auth-tab').forEach(function(tab) {
-    tab.addEventListener('click', function() {
-        document.querySelectorAll('.auth-tab').forEach(function(t) {
-            t.classList.remove('active');
+window.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.auth-tab').forEach(function(t) {
+                t.classList.remove('active');
+            });
+            document.querySelectorAll('.auth-form').forEach(function(f) {
+                f.classList.remove('active');
+            });
+            tab.classList.add('active');
+            document.getElementById(tab.dataset.tab + 'Form').classList.add('active');
         });
-        document.querySelectorAll('.auth-form').forEach(function(f) {
-            f.classList.remove('active');
-        });
-        tab.classList.add('active');
-        document.getElementById(tab.dataset.tab + 'Form').classList.add('active');
     });
 });
 
-        // ==================== 用户名转邮箱 ====================
+// ==================== 用户名转邮箱 ====================
 function usernameToEmail(username) {
     var encoded = btoa(encodeURIComponent(username));
     return encoded + '@gmail.com';
 }
-        
+          
         // ==================== 配置 ====================
         const SUPABASE_URL = 'https://pbdzollgxbtrkbkefcpy.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiZHpvbGxneGJ0cmtia2VmY3B5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4Njc0MTYsImV4cCI6MjA4ODQ0MzQxNn0.RyiNa-ZyrAJPXCi57VyiSVFP0Sbhqbh_JOUEFGOS9vw';
