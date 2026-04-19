@@ -680,7 +680,8 @@
 
       <script>
         // ==================== 先注册标签切换事件 ====================
-window.addEventListener('DOMContentLoaded', function() {
+// 注册标签切换事件（兼容DOMContentLoaded已触发的情况）
+function initAuthTabs() {
     document.querySelectorAll('.auth-tab').forEach(function(tab) {
         tab.addEventListener('click', function() {
             document.querySelectorAll('.auth-tab').forEach(function(t) {
@@ -693,7 +694,12 @@ window.addEventListener('DOMContentLoaded', function() {
             document.getElementById(tab.dataset.tab + 'Form').classList.add('active');
         });
     });
-});
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuthTabs);
+} else {
+    initAuthTabs();
+}
 
 // ==================== 用户名转邮箱 ====================
 function usernameToEmail(username) {
@@ -701,7 +707,7 @@ function usernameToEmail(username) {
     return encoded + '@gmail.com';
 }
 
-          alert('前面的代码没问题');
+
           
         // ==================== 配置 ====================
         const SUPABASE_URL = 'https://pbdzollgxbtrkbkefcpy.supabase.co';
@@ -2035,12 +2041,28 @@ function usernameToEmail(username) {
                     const ver = m.versions?.[m.current];
                     if (!ver) continue;
                     
-                    if (m.role === 'user' && ver.files?.length && model.supports_vision) {
+                    if (m.role === 'user' && ver.files?.length) {
                         const content = [{ type: 'text', text: ver.content || '' }];
+                        const imageFiles = [];
+                        const textFiles = [];
                         for (const f of ver.files) {
-                            if (f.type?.startsWith('image/')) {
-                                content.push({ type: 'image_url', image_url: { url: f.data } });
+                            if (f.type?.startsWith('image/') && model.supports_vision) {
+                                imageFiles.push(f);
+                            } else if (f.data && typeof f.data === 'string') {
+                                textFiles.push(f);
                             }
+                        }
+                        // 图片作为 image_url 发送
+                        for (const f of imageFiles) {
+                            content.push({ type: 'image_url', image_url: { url: f.data } });
+                        }
+                        // 非图片文件内容拼接到文本中
+                        if (textFiles.length > 0) {
+                            let fileText = '\n\n[附件内容]:\n';
+                            for (const f of textFiles) {
+                                fileText += '--- ' + f.name + ' ---\n' + f.data + '\n\n';
+                            }
+                            content[0].text += fileText;
                         }
                         historyMsgs.push({ role: 'user', content });
                     } else {
