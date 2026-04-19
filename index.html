@@ -1,17 +1,6 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Claudebox</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+Claudebox 修复版源码（含API Key）
+修复内容：1. 修复 supabase 变量名冲突（const supabase → const sb）  2. 移除重复的 usernameToEmail 声明  3. 移除调试 alert  4. DOMContentLoaded 兼容性修复（包裹成 initApp()）  5. 自动注入 API 设置（含 gptsapi key，用户可直接使用）
+<!DOCTYPE html><html lang="zh-CN"><head>    <meta charset="UTF-8">    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">    <title>Claudebox</title>    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>    <style>        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         :root {
             --bg: #f5f4ef; --bg2: #eae8e1; --bg3: #e0ded7;
             --text: #1a1915; --text2: #6b6963; --text3: #9d9a93;
@@ -386,334 +375,35 @@
         
         #fileInput { display: none; }
         .katex-display { overflow-x: auto; overflow-y: hidden; padding: 8px 0; }
-    </style>
-</head>
-<body>
-    <!-- 登录/注册页 -->
-    <div class="auth-container" id="authContainer">
-        <div class="auth-box">
-            <div class="auth-logo">
-                <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                <h1>Claudebox</h1>
-            </div>
-            <div class="auth-tabs">
-                <div class="auth-tab active" data-tab="login">登录</div>
-                <div class="auth-tab" data-tab="register">注册</div>
-            </div>
-            <div class="auth-error" id="authError"></div>
-            <form class="auth-form active" id="loginForm">
-                <input type="text" class="auth-input" id="loginUsername" placeholder="用户名" required>
-                <input type="password" class="auth-input" id="loginPassword" placeholder="密码" required>
-                <button type="submit" class="auth-btn">登录</button>
-            </form>
-            <form class="auth-form" id="registerForm">
-                <input type="text" class="auth-input" id="regUsername" placeholder="用户名" required>
-                <input type="password" class="auth-input" id="regPassword" placeholder="密码" required>
-                <input type="password" class="auth-input" id="regPassword2" placeholder="确认密码" required>
-                <button type="submit" class="auth-btn">注册</button>
-            </form>
-        </div>
-    </div>
+    </style></head><body>    <!-- 登录/注册页 -->    <div class="auth-container" id="authContainer">        <div class="auth-box">            <div class="auth-logo">                <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>                <h1>Claudebox</h1>            </div>            <div class="auth-tabs">                <div class="auth-tab active" data-tab="login">登录</div>
+                <div class="auth-tab" data-tab="register">注册</div>            </div>            <div class="auth-error" id="authError"></div>            <form class="auth-form active" id="loginForm">                <input type="text" class="auth-input" id="loginUsername" placeholder="用户名" required>                <input type="password" class="auth-input" id="loginPassword" placeholder="密码" required>                <button type="submit" class="auth-btn">登录</button>            </form>            <form class="auth-form" id="registerForm">                <input type="text" class="auth-input" id="regUsername" placeholder="用户名" required>                <input type="password" class="auth-input" id="regPassword" placeholder="密码" required>                <input type="password" class="auth-input" id="regPassword2" placeholder="确认密码" required>                <button type="submit" class="auth-btn">注册</button>            </form>        </div>    </div>    <!-- 主应用 -->    <div class="app-container" id="appContainer">        <div class="sidebar-overlay" id="sidebarOverlay"></div>        
+        <!-- 侧边栏 -->        <aside class="sidebar" id="sidebar">            <div class="sidebar-header">                <div class="sidebar-title">                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>                    <span id="sidebarTitle">Claudebox</span>                </div>            </div>            <nav class="sidebar-nav">                <div class="nav-item" id="newChatBtn">                    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>                    <span>New chat</span>                </div>                <div class="nav-item" id="chatsBtn">                    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>                    <span>Chats</span>                </div>                <div class="nav-item" id="memoriesBtn">                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>                    <span>Memories</span>                </div>            </nav>            <div class="nav-divider"></div>            <div class="nav-section-title">Recents</div>            <div class="history-list" id="historyList"></div>            <div class="sidebar-footer">                <div class="nav-item" id="settingsBtn">                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>                    <span>Settings</span>                </div>                <div class="nav-item" id="logoutBtn">                    <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>                    <span>Log out</span>                </div>                <div class="nav-divider"></div>                <div class="user-info" id="userInfo">                    <div class="user-avatar" id="userAvatar">U</div>                    <span class="user-name" id="userName">User</span>                </div>            </div>        </aside>        <!-- 主内容 -->        <main class="main">            <header class="mobile-header">                <div class="mobile-menu-btn" id="mobileMenuBtn">                    <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>                </div>                <div class="mobile-title" id="mobileTitle">Claudebox</div>                <div class="mobile-menu-btn" id="mobileNewChat">                    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>                </div>            </header>            <div class="welcome" id="welcomePage">                <div class="welcome-logo">                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>                </div>                <h1 id="welcomeTitle">How can I help you today?</h1>                <p>Start a conversation with AI</p>                <div class="quick-actions">                    <div class="quick-action" onclick="sendSuggestion('帮我写一个Python快速排序')">🖥️ 写代码</div>                    <div class="quick-action" onclick="sendSuggestion('解释什么是机器学习')">🧠 学习知识</div>                    <div class="quick-action" onclick="sendSuggestion('帮我写一封商务邮件')">✉️ 写邮件</div>                    <div class="quick-action" onclick="sendSuggestion('帮我翻译一段英文')">🌍 翻译</div>                </div>            </div>            <div class="chat" id="chatPage"></div>            
+            <div class="chats-page" id="chatsPage">                <div class="chats-header">                    <h1 class="chats-title">Chats</h1>                    <input type="text" class="chats-search" id="chatsSearch" placeholder="Search your chats...">                </div>                <div class="chats-actions">                    <span class="chats-count" id="chatsCount">0 chats</span>                    <span class="chats-select-btn" id="chatsSelectBtn">Select</span>                </div>                <div class="chats-list" id="chatsList"></div>            </div>            <div class="scroll-bottom-btn" id="scrollBottomBtn">                <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>            </div>            <div class="input-area" id="inputArea">                <div class="input-wrapper">                    <div class="input-container">                        <div class="file-preview" id="filePreview"></div>                        <div class="input-main">                            <button class="attach-btn" id="attachBtn">                                <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>                            </button>                            <textarea class="input-text" id="inputText" placeholder="Reply..." rows="1"></textarea>                            <button class="send-btn" id="sendBtn">                                <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>                            </button>                        </div>                        <div class="input-footer">                            <div class="model-selector" id="modelSelector">                                <span id="currentModelName">选择模型</span>                                <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>                            </div>                            <div class="model-dropdown" id="modelDropdown"></div>                        </div>                    </div>                </div>            </div>        </main>    </div>    <input type="file" id="fileInput" multiple accept="image/*,.txt,.md,.json,.pdf">    <!-- 设置弹窗 -->    <div class="modal" id="settingsModal">        <div class="modal-content" style="max-width: 550px;">            <div class="modal-header">                <div class="modal-title">Settings</div>                <button class="modal-close" onclick="closeModal('settingsModal')">                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>                </button>            </div>            <div class="modal-body">                <div class="settings-section">                    <div class="settings-section-title">界面设置</div>                    <div class="settings-item">                        <span class="settings-label">自定义标题</span>                        <input type="text" class="settings-input" id="customTitle" placeholder="Claudebox">                    </div>                    <div class="settings-item">                        <span class="settings-label">系统提示词</span>                        <input type="text" class="settings-input" id="systemPrompt" placeholder="可选">                    </div>                </div>                
+                <div class="settings-section">                    <div class="settings-section-title">记忆功能</div>                    <div class="settings-item">                        <div>                            <span class="settings-label">AI 持久记忆</span>                            <div class="settings-desc">允许 AI 记住关于你的重要信息</div>                        </div>                        <div class="toggle-switch active" id="toggleMemory" onclick="toggleSetting('enableMemory')"></div>                    </div>                    <div class="settings-item">                        <div>                            <span class="settings-label">历史对话搜索</span>                            <div class="settings-desc">允许 AI 搜索过去的聊天记录</div>                        </div>                        <div class="toggle-switch active" id="toggleHistorySearch" onclick="toggleSetting('enableHistorySearch')"></div>                    </div>                </div>                
+                <div class="settings-section">                    <div class="settings-section-title">API 配置</div>                    <div id="apiList"></div>                    <button class="auth-btn" style="margin-top: 12px" onclick="showAddApiModal()">添加 API</button>                </div>                
+                <div class="settings-section">                    <div class="settings-section-title">已添加模型</div>                    <div id="modelList"></div>                </div>            </div>        </div>    </div>    <!-- 记忆管理弹窗 -->    <div class="modal" id="memoriesModal">        <div class="modal-content" style="max-width: 600px;">            <div class="modal-header">                <div class="modal-title">记忆管理</div>                <button class="modal-close" onclick="closeModal('memoriesModal')">                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>                </button>            </div>            <div class="modal-body">                <div class="memories-header">
+                    <p style="color: var(--text2); font-size: 13px; margin: 0;">这些是 AI 记住的关于你的信息</p>                    <div class="memories-actions">                        <button class="auth-btn secondary" style="padding: 8px 16px; font-size: 13px;" id="memoriesSelectBtn" onclick="toggleMemoriesSelectMode()">选择</button>                    </div>                </div>                <div id="memoriesList"></div>                <div id="memoriesSelectActions" style="display: none; margin-top: 16px;">                    <div style="display: flex; gap: 12px; justify-content: space-between; align-items: center;">                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">                            <input type="checkbox" id="selectAllMemories" onchange="toggleSelectAllMemories()">                            全选
+                        </label>                        <div style="display: flex; gap: 8px;">                            <button class="auth-btn secondary" style="padding: 8px 16px; font-size: 13px;" onclick="cancelMemoriesSelect()">取消</button>                            <button class="auth-btn danger" style="padding: 8px 16px; font-size: 13px;" onclick="deleteSelectedMemories()">删除选中</button>                        </div>                    </div>                </div>            </div>        </div>    </div>    <!-- 确认删除弹窗 -->    <div class="modal" id="confirmDeleteModal">        <div class="modal-content" style="max-width: 400px;">            <div class="modal-body">                <div class="confirm-dialog">                    <div class="confirm-dialog-icon">                        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>                    </div>                    <div class="confirm-dialog-title" id="confirmDeleteTitle">确认删除</div>                    <div class="confirm-dialog-text" id="confirmDeleteText">确定要删除这些记忆吗？此操作无法撤销。</div>                    <div class="confirm-dialog-buttons">                        <button class="auth-btn secondary" onclick="closeModal('confirmDeleteModal')">取消</button>                        <button class="auth-btn danger" id="confirmDeleteBtn" onclick="confirmDeleteMemories()">删除</button>                    </div>                </div>            </div>        </div>    </div>    <!-- Toast -->    <div class="toast" id="toast"></div>    <!-- 添加 API 弹窗 -->    <div class="modal" id="addApiModal">        <div class="modal-content">            <div class="modal-header">                <div class="modal-title">添加 API</div>                <button class="modal-close" onclick="closeModal('addApiModal')">                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>                </button>            </div>            <div class="modal-body">                <div class="settings-item">                    <span class="settings-label">名称</span>                    <input type="text" class="settings-input" id="apiName" placeholder="如：OpenAI">                </div>                <div class="settings-item">                    <span class="settings-label">地址</span>                    <input type="text" class="settings-input" id="apiUrl" placeholder="https://api.openai.com/v1">                </div>                <div class="settings-item">                    <span class="settings-label">API Key</span>                    <input type="password" class="settings-input" id="apiKey" placeholder="sk-...">                </div>                <div class="settings-item">                    <span class="settings-label">支持图片</span>                    <input type="checkbox" id="apiSupportsVision" checked>                </div>                <div class="settings-item">                    <span class="settings-label">支持 Tools</span>                    <input type="checkbox" id="apiSupportsTools" checked>                </div>                <button class="auth-btn" style="margin-top: 16px" onclick="fetchApiModels()">获取模型</button>                <div id="fetchedModels" style="margin-top: 12px"></div>            </div>        </div>    </div>      <script>        // ==================== 自动注入API设置（供用户直接使用） ====================
+(function() {
+    if (!localStorage.getItem('claudebox_api_url')) {
+        localStorage.setItem('claudebox_api_url', 'https://api.gptsapi.net/v1');
+    }
+    if (!localStorage.getItem('claudebox_api_key')) {
+        localStorage.setItem('claudebox_api_key', 'sk-uyg016df185d871d2f99e0ad63fee3900f3a225ba44mdRzJ');
+    }
+})();
 
-    <!-- 主应用 -->
-    <div class="app-container" id="appContainer">
-        <div class="sidebar-overlay" id="sidebarOverlay"></div>
-        
-        <!-- 侧边栏 -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-title">
-                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                    <span id="sidebarTitle">Claudebox</span>
-                </div>
-            </div>
-            <nav class="sidebar-nav">
-                <div class="nav-item" id="newChatBtn">
-                    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                    <span>New chat</span>
-                </div>
-                <div class="nav-item" id="chatsBtn">
-                    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    <span>Chats</span>
-                </div>
-                <div class="nav-item" id="memoriesBtn">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    <span>Memories</span>
-                </div>
-            </nav>
-            <div class="nav-divider"></div>
-            <div class="nav-section-title">Recents</div>
-            <div class="history-list" id="historyList"></div>
-            <div class="sidebar-footer">
-                <div class="nav-item" id="settingsBtn">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                    <span>Settings</span>
-                </div>
-                <div class="nav-item" id="logoutBtn">
-                    <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    <span>Log out</span>
-                </div>
-                <div class="nav-divider"></div>
-                <div class="user-info" id="userInfo">
-                    <div class="user-avatar" id="userAvatar">U</div>
-                    <span class="user-name" id="userName">User</span>
-                </div>
-            </div>
-        </aside>
-
-        <!-- 主内容 -->
-        <main class="main">
-            <header class="mobile-header">
-                <div class="mobile-menu-btn" id="mobileMenuBtn">
-                    <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-                </div>
-                <div class="mobile-title" id="mobileTitle">Claudebox</div>
-                <div class="mobile-menu-btn" id="mobileNewChat">
-                    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                </div>
-            </header>
-
-            <div class="welcome" id="welcomePage">
-                <div class="welcome-logo">
-                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                </div>
-                <h1 id="welcomeTitle">How can I help you today?</h1>
-                <p>Start a conversation with AI</p>
-                <div class="quick-actions">
-                    <div class="quick-action" onclick="sendSuggestion('帮我写一个Python快速排序')">🖥️ 写代码</div>
-                    <div class="quick-action" onclick="sendSuggestion('解释什么是机器学习')">🧠 学习知识</div>
-                    <div class="quick-action" onclick="sendSuggestion('帮我写一封商务邮件')">✉️ 写邮件</div>
-                    <div class="quick-action" onclick="sendSuggestion('帮我翻译一段英文')">🌍 翻译</div>
-                </div>
-            </div>
-
-            <div class="chat" id="chatPage"></div>
-            
-            <div class="chats-page" id="chatsPage">
-                <div class="chats-header">
-                    <h1 class="chats-title">Chats</h1>
-                    <input type="text" class="chats-search" id="chatsSearch" placeholder="Search your chats...">
-                </div>
-                <div class="chats-actions">
-                    <span class="chats-count" id="chatsCount">0 chats</span>
-                    <span class="chats-select-btn" id="chatsSelectBtn">Select</span>
-                </div>
-                <div class="chats-list" id="chatsList"></div>
-            </div>
-
-            <div class="scroll-bottom-btn" id="scrollBottomBtn">
-                <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-
-            <div class="input-area" id="inputArea">
-                <div class="input-wrapper">
-                    <div class="input-container">
-                        <div class="file-preview" id="filePreview"></div>
-                        <div class="input-main">
-                            <button class="attach-btn" id="attachBtn">
-                                <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                            </button>
-                            <textarea class="input-text" id="inputText" placeholder="Reply..." rows="1"></textarea>
-                            <button class="send-btn" id="sendBtn">
-                                <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                            </button>
-                        </div>
-                        <div class="input-footer">
-                            <div class="model-selector" id="modelSelector">
-                                <span id="currentModelName">选择模型</span>
-                                <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-                            </div>
-                            <div class="model-dropdown" id="modelDropdown"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <input type="file" id="fileInput" multiple accept="image/*,.txt,.md,.json,.pdf">
-
-    <!-- 设置弹窗 -->
-    <div class="modal" id="settingsModal">
-        <div class="modal-content" style="max-width: 550px;">
-            <div class="modal-header">
-                <div class="modal-title">Settings</div>
-                <button class="modal-close" onclick="closeModal('settingsModal')">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="settings-section">
-                    <div class="settings-section-title">界面设置</div>
-                    <div class="settings-item">
-                        <span class="settings-label">自定义标题</span>
-                        <input type="text" class="settings-input" id="customTitle" placeholder="Claudebox">
-                    </div>
-                    <div class="settings-item">
-                        <span class="settings-label">系统提示词</span>
-                        <input type="text" class="settings-input" id="systemPrompt" placeholder="可选">
-                    </div>
-                </div>
-                
-                <div class="settings-section">
-                    <div class="settings-section-title">记忆功能</div>
-                    <div class="settings-item">
-                        <div>
-                            <span class="settings-label">AI 持久记忆</span>
-                            <div class="settings-desc">允许 AI 记住关于你的重要信息</div>
-                        </div>
-                        <div class="toggle-switch active" id="toggleMemory" onclick="toggleSetting('enableMemory')"></div>
-                    </div>
-                    <div class="settings-item">
-                        <div>
-                            <span class="settings-label">历史对话搜索</span>
-                            <div class="settings-desc">允许 AI 搜索过去的聊天记录</div>
-                        </div>
-                        <div class="toggle-switch active" id="toggleHistorySearch" onclick="toggleSetting('enableHistorySearch')"></div>
-                    </div>
-                </div>
-                
-                <div class="settings-section">
-                    <div class="settings-section-title">API 配置</div>
-                    <div id="apiList"></div>
-                    <button class="auth-btn" style="margin-top: 12px" onclick="showAddApiModal()">添加 API</button>
-                </div>
-                
-                <div class="settings-section">
-                    <div class="settings-section-title">已添加模型</div>
-                    <div id="modelList"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 记忆管理弹窗 -->
-    <div class="modal" id="memoriesModal">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <div class="modal-title">记忆管理</div>
-                <button class="modal-close" onclick="closeModal('memoriesModal')">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="memories-header">
-                    <p style="color: var(--text2); font-size: 13px; margin: 0;">这些是 AI 记住的关于你的信息</p>
-                    <div class="memories-actions">
-                        <button class="auth-btn secondary" style="padding: 8px 16px; font-size: 13px;" id="memoriesSelectBtn" onclick="toggleMemoriesSelectMode()">选择</button>
-                    </div>
-                </div>
-                <div id="memoriesList"></div>
-                <div id="memoriesSelectActions" style="display: none; margin-top: 16px;">
-                    <div style="display: flex; gap: 12px; justify-content: space-between; align-items: center;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;">
-                            <input type="checkbox" id="selectAllMemories" onchange="toggleSelectAllMemories()">
-                            全选
-                        </label>
-                        <div style="display: flex; gap: 8px;">
-                            <button class="auth-btn secondary" style="padding: 8px 16px; font-size: 13px;" onclick="cancelMemoriesSelect()">取消</button>
-                            <button class="auth-btn danger" style="padding: 8px 16px; font-size: 13px;" onclick="deleteSelectedMemories()">删除选中</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 确认删除弹窗 -->
-    <div class="modal" id="confirmDeleteModal">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-body">
-                <div class="confirm-dialog">
-                    <div class="confirm-dialog-icon">
-                        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    </div>
-                    <div class="confirm-dialog-title" id="confirmDeleteTitle">确认删除</div>
-                    <div class="confirm-dialog-text" id="confirmDeleteText">确定要删除这些记忆吗？此操作无法撤销。</div>
-                    <div class="confirm-dialog-buttons">
-                        <button class="auth-btn secondary" onclick="closeModal('confirmDeleteModal')">取消</button>
-                        <button class="auth-btn danger" id="confirmDeleteBtn" onclick="confirmDeleteMemories()">删除</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
-
-    <!-- 添加 API 弹窗 -->
-    <div class="modal" id="addApiModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">添加 API</div>
-                <button class="modal-close" onclick="closeModal('addApiModal')">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="settings-item">
-                    <span class="settings-label">名称</span>
-                    <input type="text" class="settings-input" id="apiName" placeholder="如：OpenAI">
-                </div>
-                <div class="settings-item">
-                    <span class="settings-label">地址</span>
-                    <input type="text" class="settings-input" id="apiUrl" placeholder="https://api.openai.com/v1">
-                </div>
-                <div class="settings-item">
-                    <span class="settings-label">API Key</span>
-                    <input type="password" class="settings-input" id="apiKey" placeholder="sk-...">
-                </div>
-                <div class="settings-item">
-                    <span class="settings-label">支持图片</span>
-                    <input type="checkbox" id="apiSupportsVision" checked>
-                </div>
-                <div class="settings-item">
-                    <span class="settings-label">支持 Tools</span>
-                    <input type="checkbox" id="apiSupportsTools" checked>
-                </div>
-                <button class="auth-btn" style="margin-top: 16px" onclick="fetchApiModels()">获取模型</button>
-                <div id="fetchedModels" style="margin-top: 12px"></div>
-            </div>
-        </div>
-    </div>
-
-      <script>
-        // ==================== 先注册标签切换事件 ====================
-// 注册标签切换事件（兼容DOMContentLoaded已触发的情况）
-function initAuthTabs() {
-    document.querySelectorAll('.auth-tab').forEach(function(tab) {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.auth-tab').forEach(function(t) {
-                t.classList.remove('active');
-            });
-            document.querySelectorAll('.auth-form').forEach(function(f) {
-                f.classList.remove('active');
-            });
-            tab.classList.add('active');
-            document.getElementById(tab.dataset.tab + 'Form').classList.add('active');
-        });
-    });
-}
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAuthTabs);
-} else {
-    initAuthTabs();
-}
-
-// ==================== 用户名转邮箱 ====================
+        // ==================== 用户名转邮箱 ====================
 function usernameToEmail(username) {
     var encoded = btoa(encodeURIComponent(username));
     return encoded + '@gmail.com';
 }
 
-
-          
         // ==================== 配置 ====================
         const SUPABASE_URL = 'https://pbdzollgxbtrkbkefcpy.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiZHpvbGxneGJ0cmtia2VmY3B5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4Njc0MTYsImV4cCI6MjA4ODQ0MzQxNn0.RyiNa-ZyrAJPXCi57VyiSVFP0Sbhqbh_JOUEFGOS9vw';
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // ==================== 状态 ====================
         let currentUser = null;
@@ -752,16 +442,13 @@ function usernameToEmail(username) {
                         properties: {
                             keyword: {
                                 type: "string",
-                                description: "搜索关键词"
-                            },
+                                description: "搜索关键词"                            },
                             history_id: {
                                 type: "string",
-                                description: "可选，指定在某个特定对话中搜索"
-                            },
+                                description: "可选，指定在某个特定对话中搜索"                            },
                             limit: {
                                 type: "integer",
-                                description: "返回结果数量限制，默认10"
-                            }
+                                description: "返回结果数量限制，默认10"                            }
                         },
                         required: ["keyword"]
                     }
@@ -777,8 +464,7 @@ function usernameToEmail(username) {
                         properties: {
                             limit: {
                                 type: "integer",
-                                description: "返回数量限制，默认10"
-                            }
+                                description: "返回数量限制，默认10"                            }
                         }
                     }
                 }
@@ -793,12 +479,10 @@ function usernameToEmail(username) {
                         properties: {
                             history_id: {
                                 type: "string",
-                                description: "对话ID"
-                            },
+                                description: "对话ID"                            },
                             message_index: {
                                 type: "integer",
-                                description: "消息索引（从0开始）"
-                            }
+                                description: "消息索引（从0开始）"                            }
                         },
                         required: ["history_id", "message_index"]
                     }
@@ -836,7 +520,9 @@ function usernameToEmail(username) {
             breaks: true
         });
 
-        // ==================== 认证系统 ====================
+        // ==================== 初始化入口 ====================
+        function initApp() {
+        // ---- 认证系统：标签切换 ----
         document.querySelectorAll('.auth-tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
@@ -846,12 +532,13 @@ function usernameToEmail(username) {
             });
         });
 
+        // ---- 登录表单 ----
         $('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = $('loginUsername').value.trim();
             const password = $('loginPassword').value;
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await sb.auth.signInWithPassword({
                     email: usernameToEmail(username),
                     password: password
                 });
@@ -877,7 +564,7 @@ function usernameToEmail(username) {
                 return;
             }
             try {
-                const { data, error } = await supabase.auth.signUp({
+                const { data, error } = await sb.auth.signUp({
                     email: usernameToEmail(username),
                     password: password,
                     options: { data: { username } }
@@ -907,7 +594,7 @@ function usernameToEmail(username) {
         }
 
         async function checkAuth() {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await sb.auth.getUser();
             if (user) {
                 currentUser = {
                     id: user.id,
@@ -917,12 +604,25 @@ function usernameToEmail(username) {
             }
         }
 
+        // ---- 退出按钮 ----
         $('logoutBtn').addEventListener('click', async () => {
-            await supabase.auth.signOut();
+            await sb.auth.signOut();
             currentUser = null;
             $('authContainer').style.display = 'flex';
             $('appContainer').classList.remove('show');
         });
+
+        // ---- 启动认证检查 ----
+        checkAuth();
+
+        } // initApp 结束
+
+        // 安全初始化：无论DOM是否已加载都能正常工作
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
 
         // ==================== 设置管理 ====================
         function toggleSetting(key) {
@@ -947,7 +647,7 @@ function usernameToEmail(username) {
         async function loadUserMemories() {
             if (!currentUser) return;
             try {
-                const { data, error } = await supabase
+                const { data, error } = await sb
                     .from('user_memories')
                     .select('*')
                     .eq('user_id', currentUser.id)
@@ -973,7 +673,7 @@ function usernameToEmail(username) {
         async function createMemory(content, category = 'general', expiresAt = null) {
             if (!currentUser) return null;
             try {
-                const { data, error } = await supabase
+                const { data, error } = await sb
                     .from('user_memories')
                     .insert({
                         user_id: currentUser.id,
@@ -996,7 +696,7 @@ function usernameToEmail(username) {
         async function updateMemory(id, newContent) {
             if (!currentUser) return false;
             try {
-                const { error } = await supabase
+                const { error } = await sb
                     .from('user_memories')
                     .update({
                         content: newContent,
@@ -1020,7 +720,7 @@ function usernameToEmail(username) {
         async function deleteMemory(id, silent = false) {
             if (!currentUser) return false;
             try {
-                const { error } = await supabase
+                const { error } = await sb
                     .from('user_memories')
                     .update({ is_active: false })
                     .eq('id', id);
@@ -1038,7 +738,7 @@ function usernameToEmail(username) {
         async function deleteMemoriesBatch(ids) {
             if (!currentUser || !ids.length) return false;
             try {
-                const { error } = await supabase
+                const { error } = await sb
                     .from('user_memories')
                     .update({ is_active: false })
                     .in('id', ids);
@@ -1064,22 +764,9 @@ function usernameToEmail(username) {
             $('memoriesSelectBtn').style.display = 'block';
             
             list.innerHTML = userMemories.map(m => `
-                <div class="memory-item" data-id="${m.id}" onclick="handleMemoryClick('${m.id}')">
-                    <input type="checkbox" class="memory-checkbox" data-id="${m.id}" onclick="event.stopPropagation()">
-                    <div class="memory-main">
-                        <div class="memory-content">${esc(m.content)}</div>
-                        <div class="memory-meta">
-                            创建于 ${formatTime(m.created_at)}
+                <div class="memory-item" data-id="${m.id}" onclick="handleMemoryClick('${m.id}')">                    <input type="checkbox" class="memory-checkbox" data-id="${m.id}" onclick="event.stopPropagation()">                    <div class="memory-main">                        <div class="memory-content">${esc(m.content)}</div>                        <div class="memory-meta">                            创建于 ${formatTime(m.created_at)}
                             ${m.updated_at !== m.created_at ? ` · 更新于 ${formatTime(m.updated_at)}` : ''}
-                        </div>
-                    </div>
-                    <div class="memory-actions">
-                        <button class="memory-btn delete" onclick="event.stopPropagation();deleteMemorySingle('${m.id}')" title="删除">
-                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+                        </div>                    </div>                    <div class="memory-actions">                        <button class="memory-btn delete" onclick="event.stopPropagation();deleteMemorySingle('${m.id}')" title="删除">                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>                        </button>                    </div>                </div>            `).join('');
             
             if (memoriesSelectMode) {
                 $('memoriesList').classList.add('memories-select-mode');
@@ -1189,7 +876,7 @@ function usernameToEmail(username) {
             if (!currentUser) return [];
             
             try {
-                let query = supabase
+                let query = sb
                     .from('chat_search_index')
                     .select('*')
                     .eq('user_id', currentUser.id)
@@ -1240,7 +927,7 @@ function usernameToEmail(username) {
             if (!currentUser || !historyId) return;
             
             try {
-                await supabase
+                await sb
                     .from('chat_search_index')
                     .delete()
                     .eq('history_id', historyId);
@@ -1255,7 +942,7 @@ function usernameToEmail(username) {
                 })).filter(r => r.content);
                 
                 if (records.length > 0) {
-                    await supabase.from('chat_search_index').insert(records);
+                    await sb.from('chat_search_index').insert(records);
                 }
             } catch (err) {
                 console.error('索引聊天记录失败:', err);
@@ -1539,7 +1226,7 @@ function usernameToEmail(username) {
         async function loadUserData() {
             try {
                 // 加载设置
-                const { data: settingsData } = await supabase
+                const { data: settingsData } = await sb
                     .from('user_settings')
                     .select('*')
                     .eq('user_id', currentUser.id)
@@ -1550,7 +1237,7 @@ function usernameToEmail(username) {
                 }
 
                 // 加载 API
-                const { data: apisData } = await supabase
+                const { data: apisData } = await sb
                     .from('user_apis')
                     .select('*')
                     .eq('user_id', currentUser.id);
@@ -1558,7 +1245,7 @@ function usernameToEmail(username) {
                 savedApis = apisData || [];
 
                 // 加载模型
-                const { data: modelsData } = await supabase
+                const { data: modelsData } = await sb
                     .from('user_models')
                     .select('*')
                     .eq('user_id', currentUser.id);
@@ -1569,7 +1256,7 @@ function usernameToEmail(username) {
                 }
 
                 // 加载历史记录
-                const { data: historiesData } = await supabase
+                const { data: historiesData } = await sb
                     .from('chat_histories')
                     .select('*')
                     .eq('user_id', currentUser.id)
@@ -1584,7 +1271,7 @@ function usernameToEmail(username) {
         async function saveSettings() {
             if (!currentUser) return;
             try {
-                await supabase
+                await sb
                     .from('user_settings')
                     .upsert({
                         user_id: currentUser.id,
@@ -1605,7 +1292,7 @@ function usernameToEmail(username) {
             
             try {
                 if (!currentHistoryId) {
-                    const { data } = await supabase
+                    const { data } = await sb
                         .from('chat_histories')
                         .insert({
                             user_id: currentUser.id,
@@ -1620,7 +1307,7 @@ function usernameToEmail(username) {
                     currentHistoryId = data.id;
                     histories.unshift(data);
                 } else {
-                    await supabase
+                    await sb
                         .from('chat_histories')
                         .update({
                             messages: messages,
@@ -1668,18 +1355,7 @@ function usernameToEmail(username) {
             }
             
             list.innerHTML = histories.slice(0, 15).map(h => `
-                <div class="history-item ${h.id === currentHistoryId ? 'active' : ''}" onclick="loadHistory('${h.id}')">
-                    <div class="history-info">
-                        <div class="history-title">${esc(h.title || '未命名')}</div>
-                        <div class="history-time">${formatTime(h.updated_at)}</div>
-                    </div>
-                    <div class="history-menu-btn" onclick="event.stopPropagation();showHistoryMenu('${h.id}')">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                            <circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="18" r="1.5"/>
-                        </svg>
-                    </div>
-                </div>
-            `).join('');
+                <div class="history-item ${h.id === currentHistoryId ? 'active' : ''}" onclick="loadHistory('${h.id}')">                    <div class="history-info">                        <div class="history-title">${esc(h.title || '未命名')}</div>                        <div class="history-time">${formatTime(h.updated_at)}</div>                    </div>                    <div class="history-menu-btn" onclick="event.stopPropagation();showHistoryMenu('${h.id}')">                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">                            <circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="18" r="1.5"/>                        </svg>                    </div>                </div>            `).join('');
         }
 
         function formatTime(dateStr) {
@@ -1714,11 +1390,8 @@ function usernameToEmail(username) {
             for (const [apiName, modelList] of Object.entries(groups)) {
                 html += `<div class="model-group-title">${esc(apiName)}</div>`;
                 html += modelList.map(m => `
-                    <div class="model-option ${m.id === currentModelId ? 'active' : ''}" onclick="selectModel('${m.id}')">
-                        <div class="model-option-name">${esc(m.short_name || m.model_id)}</div>
-                        ${m.short_name ? `<div class="model-option-full">${esc(m.model_id)}</div>` : ''}
-                    </div>
-                `).join('');
+                    <div class="model-option ${m.id === currentModelId ? 'active' : ''}" onclick="selectModel('${m.id}')">                        <div class="model-option-name">${esc(m.short_name || m.model_id)}</div>                        ${m.short_name ? `<div class="model-option-full">${esc(m.model_id)}</div>` : ''}
+                    </div>                `).join('');
             }
             
             dropdown.innerHTML = html;
@@ -1796,18 +1469,7 @@ function usernameToEmail(username) {
             }
             
             list.innerHTML = histories.map(h => `
-                <div class="chats-list-item" onclick="loadHistory('${h.id}')">
-                    <div class="chats-list-item-info">
-                        <div class="chats-list-item-title">${esc(h.title || '未命名')}</div>
-                        <div class="chats-list-item-time">${formatFullTime(h.updated_at)}</div>
-                    </div>
-                    <div class="chats-list-item-menu" onclick="event.stopPropagation();showHistoryMenu('${h.id}')">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                            <circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="18" r="1.5"/>
-                        </svg>
-                    </div>
-                </div>
-            `).join('');
+                <div class="chats-list-item" onclick="loadHistory('${h.id}')">                    <div class="chats-list-item-info">                        <div class="chats-list-item-title">${esc(h.title || '未命名')}</div>                        <div class="chats-list-item-time">${formatFullTime(h.updated_at)}</div>                    </div>                    <div class="chats-list-item-menu" onclick="event.stopPropagation();showHistoryMenu('${h.id}')">                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">                            <circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="18" r="1.5"/>                        </svg>                    </div>                </div>            `).join('');
         }
 
         function formatFullTime(dateStr) {
@@ -1849,7 +1511,7 @@ function usernameToEmail(username) {
             if (!newTitle) return;
             
             try {
-                await supabase.from('chat_histories').update({ title: newTitle }).eq('id', id);
+                await sb.from('chat_histories').update({ title: newTitle }).eq('id', id);
                 h.title = newTitle;
                 updateHistoryList();
                 renderChatsList();
@@ -1863,8 +1525,8 @@ function usernameToEmail(username) {
             if (!confirm('确定删除？')) return;
             
             try {
-                await supabase.from('chat_histories').delete().eq('id', id);
-                await supabase.from('chat_search_index').delete().eq('history_id', id);
+                await sb.from('chat_histories').delete().eq('id', id);
+                await sb.from('chat_search_index').delete().eq('history_id', id);
                 histories = histories.filter(h => h.id !== id);
                 if (currentHistoryId === id) newChat();
                 updateHistoryList();
@@ -1942,19 +1604,11 @@ function usernameToEmail(username) {
             container.innerHTML = attachedFiles.map((f, i) => {
                 if (f.type.startsWith('image/') && f.data) {
                     return `
-                        <div class="file-item">
-                            <img src="${f.data}">
-                            <span class="file-remove" onclick="removeFile(${i})">✕</span>
-                        </div>
-                    `;
+                        <div class="file-item">                            <img src="${f.data}">                            <span class="file-remove" onclick="removeFile(${i})">✕</span>                        </div>                    `;
                 }
                 return `
-                    <div class="file-item">
-                        <span class="file-name">${esc(f.name)}</span>
-                        ${f.loading ? '<span style="font-size:11px;color:var(--accent)">处理中...</span>' : ''}
-                        <span class="file-remove" onclick="removeFile(${i})">✕</span>
-                    </div>
-                `;
+                    <div class="file-item">                        <span class="file-name">${esc(f.name)}</span>                        ${f.loading ? '<span style="font-size:11px;color:var(--accent)">处理中...</span>' : ''}
+                        <span class="file-remove" onclick="removeFile(${i})">✕</span>                    </div>                `;
             }).join('');
         }
 
@@ -2280,8 +1934,7 @@ function usernameToEmail(username) {
                 const content = `<div class="message-bubble">${filesHtml}${renderMarkdown(ver.content || '')}</div>`;
                 
                 const avatar = isUser 
-                    ? '<div class="message-avatar"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></div>'
-                    : '<div class="message-avatar"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>';
+                    ? '<div class="message-avatar"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></div>'                    : '<div class="message-avatar"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>';
                 
                 const roleLabel = isUser ? (settings.exportUserName || '用户') : getModelDisplayName(m.modelId);
                 
@@ -2292,42 +1945,21 @@ function usernameToEmail(username) {
                     const actionDetails = formatActionDetails(ver.aiActions);
                     
                     aiActionHtml = `
-                        <div class="ai-action-indicator" onclick="toggleActionDetails(this)">
-                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                            <span>${actionText}</span>
-                        </div>
-                        <div class="ai-action-details">${actionDetails}</div>
-                    `;
+                        <div class="ai-action-indicator" onclick="toggleActionDetails(this)">                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>                            <span>${actionText}</span>                        </div>                        <div class="ai-action-details">${actionDetails}</div>                    `;
                 }
 
                 const tools = `
-                    <div class="message-tools">
-                        <button class="msg-tool-btn" onclick="copyMessage(${i})" title="复制">
-                            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                        </button>
-                        ${isUser ? `
-                            <button class="msg-tool-btn" onclick="editMessage(${i})" title="编辑">
-                                <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                            </button>
-                        ` : `
-                            <button class="msg-tool-btn" onclick="regenerate(${i})" title="重新生成">
-                                <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                            </button>
-                        `}
-                    </div>
-                `;
+                    <div class="message-tools">                        <button class="msg-tool-btn" onclick="copyMessage(${i})" title="复制">                            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>                        </button>                        ${isUser ? `
+                            <button class="msg-tool-btn" onclick="editMessage(${i})" title="编辑">                                <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>                            </button>                        ` : `
+                            <button class="msg-tool-btn" onclick="regenerate(${i})" title="重新生成">                                <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>                            </button>                        `}
+                    </div>                `;
 
                 return `
-                    <div class="message ${isUser ? 'user' : 'assistant'}">
-                        ${avatar}
-                        <div class="message-content">
-                            <div class="message-role">${esc(roleLabel)}</div>
-                            ${content}
+                    <div class="message ${isUser ? 'user' : 'assistant'}">                        ${avatar}
+                        <div class="message-content">                            <div class="message-role">${esc(roleLabel)}</div>                            ${content}
                             ${aiActionHtml}
                             ${tools}
-                        </div>
-                    </div>
-                `;
+                        </div>                    </div>                `;
             }).join('');
 
             // 处理代码块
@@ -2341,13 +1973,7 @@ function usernameToEmail(username) {
                 const header = document.createElement('div');
                 header.className = 'code-header';
                 header.innerHTML = `
-                    <span class="code-lang">${lang || 'code'}</span>
-                    <div class="code-actions">
-                        <button class="code-btn" onclick="copyCode(this)" title="复制">
-                            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                        </button>
-                    </div>
-                `;
+                    <span class="code-lang">${lang || 'code'}</span>                    <div class="code-actions">                        <button class="code-btn" onclick="copyCode(this)" title="复制">                            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>                        </button>                    </div>                `;
                 pre.insertBefore(header, block);
                 pre.dataset.code = code;
             });
@@ -2510,8 +2136,7 @@ function usernameToEmail(username) {
                 '\\phi': 'φ', '\\varphi': 'φ', '\\chi': 'χ', '\\psi': 'ψ', '\\omega': 'ω',
                 '\\Gamma': 'Γ', '\\Delta': 'Δ', '\\Theta': 'Θ', '\\Lambda': 'Λ',
                 '\\Xi': 'Ξ', '\\Pi': 'Π', '\\Sigma': 'Σ', '\\Upsilon': 'Υ',
-                '\\Phi': 'Φ', '\\Psi': 'Ψ', '\\Omega': 'Ω'
-            };
+                '\\Phi': 'Φ', '\\Psi': 'Ψ', '\\Omega': 'Ω'            };
             
             // 数学符号
             const symbols = {
@@ -2538,8 +2163,7 @@ function usernameToEmail(username) {
                 '\\ldots': '…', '\\cdots': '⋯', '\\vdots': '⋮', '\\ddots': '⋱',
                 '\\prime': '′', '\\backslash': '\\', '\\setminus': '∖',
                 '\\langle': '⟨', '\\rangle': '⟩', '\\lceil': '⌈', '\\rceil': '⌉',
-                '\\lfloor': '⌊', '\\rfloor': '⌋'
-            };
+                '\\lfloor': '⌊', '\\rfloor': '⌋'            };
             
             // 上标字符
             const superscripts = {
@@ -2550,8 +2174,7 @@ function usernameToEmail(username) {
                 'f': 'ᶠ', 'g': 'ᵍ', 'h': 'ʰ', 'i': 'ⁱ', 'j': 'ʲ',
                 'k': 'ᵏ', 'l': 'ˡ', 'm': 'ᵐ', 'n': 'ⁿ', 'o': 'ᵒ',
                 'p': 'ᵖ', 'r': 'ʳ', 's': 'ˢ', 't': 'ᵗ', 'u': 'ᵘ',
-                'v': 'ᵛ', 'w': 'ʷ', 'x': 'ˣ', 'y': 'ʸ', 'z': 'ᶻ'
-            };
+                'v': 'ᵛ', 'w': 'ʷ', 'x': 'ˣ', 'y': 'ʸ', 'z': 'ᶻ'            };
             
             // 下标字符
             const subscripts = {
@@ -2561,8 +2184,7 @@ function usernameToEmail(username) {
                 'a': 'ₐ', 'e': 'ₑ', 'h': 'ₕ', 'i': 'ᵢ', 'j': 'ⱼ',
                 'k': 'ₖ', 'l': 'ₗ', 'm': 'ₘ', 'n': 'ₙ', 'o': 'ₒ',
                 'p': 'ₚ', 'r': 'ᵣ', 's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ',
-                'v': 'ᵥ', 'x': 'ₓ'
-            };
+                'v': 'ᵥ', 'x': 'ₓ'            };
             
             // 替换希腊字母和符号
             for (const [cmd, char] of Object.entries(greek)) {
@@ -2705,14 +2327,7 @@ function usernameToEmail(username) {
             }
             
             list.innerHTML = savedApis.map(api => `
-                <div class="settings-item">
-                    <span>${esc(api.name)}</span>
-                    <div>
-                        <button onclick="editApi('${api.id}')" style="margin-right:8px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer">编辑</button>
-                        <button onclick="deleteApi('${api.id}')" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;color:#dc3545">删除</button>
-                    </div>
-                </div>
-            `).join('');
+                <div class="settings-item">                    <span>${esc(api.name)}</span>                    <div>                        <button onclick="editApi('${api.id}')" style="margin-right:8px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer">编辑</button>                        <button onclick="deleteApi('${api.id}')" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;color:#dc3545">删除</button>                    </div>                </div>            `).join('');
         }
 
         function renderModelList() {
@@ -2723,14 +2338,8 @@ function usernameToEmail(username) {
             }
             
             list.innerHTML = models.map(m => `
-                <div class="settings-item">
-                    <div>
-                        <div style="font-size:14px">${esc(m.short_name || m.model_id)}</div>
-                        ${m.short_name ? `<div style="font-size:12px;color:var(--text3)">${esc(m.model_id)}</div>` : ''}
-                    </div>
-                    <button onclick="deleteModel('${m.id}')" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;color:#dc3545">删除</button>
-                </div>
-            `).join('');
+                <div class="settings-item">                    <div>                        <div style="font-size:14px">${esc(m.short_name || m.model_id)}</div>                        ${m.short_name ? `<div style="font-size:12px;color:var(--text3)">${esc(m.model_id)}</div>` : ''}
+                    </div>                    <button onclick="deleteModel('${m.id}')" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;color:#dc3545">删除</button>                </div>            `).join('');
         }
 
         function showAddApiModal() {
@@ -2763,7 +2372,7 @@ function usernameToEmail(username) {
             if (!confirm('确定删除此 API？')) return;
             
             try {
-                await supabase.from('user_apis').delete().eq('id', id);
+                await sb.from('user_apis').delete().eq('id', id);
                 savedApis = savedApis.filter(a => a.id !== id);
                 renderApiList();
                 toast('已删除');
@@ -2776,7 +2385,7 @@ function usernameToEmail(username) {
             if (!confirm('确定删除此模型？')) return;
             
             try {
-                await supabase.from('user_models').delete().eq('id', id);
+                await sb.from('user_models').delete().eq('id', id);
                 models = models.filter(m => m.id !== id);
                 if (currentModelId === id) {
                     currentModelId = models[0]?.id || '';
@@ -2820,26 +2429,14 @@ function usernameToEmail(username) {
                 }
                 
                 container.innerHTML = `
-                    <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
-                        ${modelList.map((m, i) => `
-                            <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer">
-                                <input type="checkbox" name="fetchedModel" value="${esc(m.id || m.name || m)}" checked>
-                                <span style="font-size:13px">${esc(m.id || m.name || m)}</span>
-                            </label>
-                        `).join('')}
-                    </div>
-                    <button onclick="saveApiAndModels()" class="auth-btn" style="margin-top:12px">保存</button>
-                `;
+                    <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">                        ${modelList.map((m, i) => `
+                            <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer">                                <input type="checkbox" name="fetchedModel" value="${esc(m.id || m.name || m)}" checked>                                <span style="font-size:13px">${esc(m.id || m.name || m)}</span>                            </label>                        `).join('')}
+                    </div>                    <button onclick="saveApiAndModels()" class="auth-btn" style="margin-top:12px">保存</button>                `;
                 
                 window._currentApiInfo = { name, url, key, supportsVision, supportsTools };
             } catch (err) {
                 container.innerHTML = `
-                    <div style="padding:12px;color:#dc3545">${esc(err.message)}</div>
-                    <div style="margin-top:8px">
-                        <input type="text" id="manualModelId" placeholder="手动输入模型 ID" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">
-                        <button onclick="saveManualModel()" class="auth-btn" style="margin-top:8px">添加</button>
-                    </div>
-                `;
+                    <div style="padding:12px;color:#dc3545">${esc(err.message)}</div>                    <div style="margin-top:8px">                        <input type="text" id="manualModelId" placeholder="手动输入模型 ID" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px">                        <button onclick="saveManualModel()" class="auth-btn" style="margin-top:8px">添加</button>                    </div>                `;
                 window._currentApiInfo = { name, url, key, supportsVision, supportsTools };
             }
         }
@@ -2858,7 +2455,7 @@ function usernameToEmail(username) {
                 let apiId;
                 
                 if (currentEditingApiId) {
-                    await supabase.from('user_apis').update({
+                    await sb.from('user_apis').update({
                         name: info.name,
                         url: info.url,
                         key: info.key,
@@ -2872,7 +2469,7 @@ function usernameToEmail(username) {
                         savedApis[idx] = { ...savedApis[idx], ...info };
                     }
                 } else {
-                    const { data } = await supabase.from('user_apis').insert({
+                    const { data } = await sb.from('user_apis').insert({
                         user_id: currentUser.id,
                         name: info.name,
                         url: info.url,
@@ -2890,7 +2487,7 @@ function usernameToEmail(username) {
                     const exists = models.find(m => m.api_id === apiId && m.model_id === modelId);
                     if (exists) continue;
                     
-                    const { data } = await supabase.from('user_models').insert({
+                    const { data } = await sb.from('user_models').insert({
                         user_id: currentUser.id,
                         api_id: apiId,
                         api_name: info.name,
@@ -2936,7 +2533,7 @@ function usernameToEmail(username) {
                 if (currentEditingApiId) {
                     apiId = currentEditingApiId;
                 } else {
-                    const { data } = await supabase.from('user_apis').insert({
+                    const { data } = await sb.from('user_apis').insert({
                         user_id: currentUser.id,
                         name: info.name,
                         url: info.url,
@@ -2949,7 +2546,7 @@ function usernameToEmail(username) {
                     savedApis.push(data);
                 }
                 
-                const { data } = await supabase.from('user_models').insert({
+                const { data } = await sb.from('user_models').insert({
                     user_id: currentUser.id,
                     api_id: apiId,
                     api_name: info.name,
@@ -2975,8 +2572,4 @@ function usernameToEmail(username) {
             }
         }
 
-        // ==================== 初始化 ====================
-        checkAuth();
-    </script>
-</body>
-</html>
+    </script></body></html>
