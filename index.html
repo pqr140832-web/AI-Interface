@@ -2020,7 +2020,7 @@ function usernameToEmail(username) {
             const current = models.find(m => m.id === currentModelId);
             if (current) {
                 const displayName = current.short_name || current.model_id;
-                $('currentModelName').textContent = displayName.length > 20 ? displayName.slice(0, 20) + '...' : displayName;
+                $('currentModelName').textContent = displayName;
             }
         }
 
