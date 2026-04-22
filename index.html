@@ -123,14 +123,17 @@
         
         /* 思考过程 */
         .thinking-block { margin-top: 8px; margin-bottom: 8px; }
-        .thinking-toggle { display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer; font-size: 13px; color: var(--text3); user-select: none; }
-        .thinking-toggle:hover { color: var(--text2); }
-        .thinking-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; transition: transform 0.2s; }
-        .thinking-toggle.expanded svg { transform: rotate(90deg); }
-        .thinking-content { display: none; padding: 10px 14px; margin-top: 4px; background: var(--bg2); border-radius: 10px; font-size: 13px; line-height: 1.6; color: var(--text2); max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
-        .thinking-content.show { display: block; }
-        .thinking-spinner { display: inline-block; animation: thinking-spin 1s linear infinite; }
-        @keyframes thinking-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .thinking-header { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; font-size: 13px; color: var(--text3); user-select: none; }
+        .thinking-header:hover { color: var(--text2); }
+        .thinking-header svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; transition: transform 0.2s; }
+        .thinking-header.expanded svg { transform: rotate(90deg); }
+        .thinking-header .thinking-clock { display: inline-flex; opacity: 0.7; }
+        .thinking-content { padding: 10px 14px; margin-top: 4px; background: var(--bg2); border-radius: 10px; font-size: 13px; line-height: 1.6; color: #999; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+        .thinking-content.collapsed { display: none; }
+        @keyframes thinking-dots { 0%, 20% { opacity: 0.2; } 50% { opacity: 1; } 80%, 100% { opacity: 0.2; } }
+        .thinking-dots span { animation: thinking-dots 1.4s infinite; }
+        .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
 
         
         /* 欢迎页 */
@@ -2661,6 +2664,7 @@ function usernameToEmail(username) {
                 const decoder = new TextDecoder();
                 let fullContent = '';
                 let fullThinking = '';
+                let thinkingStartTime = null;
                 let toolCalls = [];
 
                 while (true) {
@@ -2681,14 +2685,23 @@ function usernameToEmail(username) {
                                 
                                 // 处理思考过程（推理模型）
                                 if (delta?.reasoning_content || delta?.reasoning) {
+                                    if (!thinkingStartTime) thinkingStartTime = Date.now();
                                     fullThinking += (delta.reasoning_content || delta.reasoning);
                                     messages[messages.length - 1].versions[0].thinking = fullThinking;
+                                    messages[messages.length - 1].versions[0].thinkingDone = false;
+                                    messages[messages.length - 1].versions[0].thinkingStart = thinkingStartTime;
                                     renderLastMessage();
                                     scrollToBottom();
                                 }
                                 
                                 // 处理内容
                                 if (delta?.content) {
+                                    if (fullThinking && !messages[messages.length - 1].versions[0].thinkingDone) {
+                                        messages[messages.length - 1].versions[0].thinkingDone = true;
+                                        if (thinkingStartTime) {
+                                            messages[messages.length - 1].versions[0].thinkingDuration = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
+                                        }
+                                    }
                                     fullContent += delta.content;
                                     messages[messages.length - 1].versions[0].content = fullContent;
                                     renderLastMessage();
@@ -2763,13 +2776,22 @@ function usernameToEmail(username) {
                                     const json = JSON.parse(data);
                                     const delta = json.choices?.[0]?.delta;
                                     if (delta?.reasoning_content || delta?.reasoning) {
+                                        if (!thinkingStartTime) thinkingStartTime = Date.now();
                                         fullThinking += (delta.reasoning_content || delta.reasoning);
                                         messages[messages.length - 1].versions[0].thinking = fullThinking;
+                                        messages[messages.length - 1].versions[0].thinkingDone = false;
+                                        messages[messages.length - 1].versions[0].thinkingStart = thinkingStartTime;
                                         renderLastMessage();
                                         scrollToBottom();
                                     }
                                     const content = delta?.content;
                                     if (content) {
+                                        if (fullThinking && !messages[messages.length - 1].versions[0].thinkingDone) {
+                                            messages[messages.length - 1].versions[0].thinkingDone = true;
+                                            if (thinkingStartTime) {
+                                                messages[messages.length - 1].versions[0].thinkingDuration = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
+                                            }
+                                        }
                                         fullContent += content;
                                         messages[messages.length - 1].versions[0].content = fullContent;
                                         renderLastMessage();
@@ -2882,14 +2904,18 @@ function usernameToEmail(username) {
                 // 思考过程（推理模型）
                 let thinkingHtml = '';
                 if (!isUser && ver.thinking) {
-                    const isStillThinking = isLastStreaming && !ver.content;
+                    const isStillThinking = isLastStreaming && !ver.thinkingDone;
+                    const duration = ver.thinkingDuration || '';
+                    const headerText = isStillThinking
+                        ? '<span class="thinking-clock"><svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Thinking<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>'
+                        : (duration ? 'Thought for ' + duration + 's' : 'Thought for a while');
                     thinkingHtml = `
                         <div class="thinking-block">
-                            <div class="thinking-toggle${isStillThinking ? '' : ' expanded'}" onclick="toggleThinking(this)">
+                            <div class="thinking-header${isStillThinking ? ' expanded' : ''}" onclick="toggleThinking(this)">
                                 <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                                <span>${isStillThinking ? '<span class="thinking-spinner">💭</span> 正在思考...' : '已思考 ' + ver.thinking.length + ' 字'}</span>
+                                <span>${headerText}</span>
                             </div>
-                            <div class="thinking-content${isStillThinking ? '' : ' show'}">${esc(ver.thinking)}</div>
+                            <div class="thinking-content${isStillThinking ? '' : ' collapsed'}">${esc(ver.thinking)}</div>
                         </div>
                     `;
                 }
@@ -2954,12 +2980,36 @@ function usernameToEmail(username) {
         function renderLastMessage() {
             const chat = $('chatPage');
             const lastMsg = messages[messages.length - 1];
+            if (!lastMsg) return;
+            const ver = lastMsg.versions[0];
+
+            // Update thinking block during streaming
+            const thinkingBlock = chat.querySelector('.message:last-child .thinking-block');
+            const thinkingContent = chat.querySelector('.message:last-child .thinking-content');
+            const thinkingHeader = chat.querySelector('.message:last-child .thinking-header');
+
+            if (ver.thinking && thinkingContent) {
+                thinkingContent.textContent = ver.thinking;
+                // Auto-scroll thinking content to bottom
+                thinkingContent.scrollTop = thinkingContent.scrollHeight;
+
+                if (ver.thinkingDone && thinkingHeader) {
+                    // Thinking just finished - collapse it
+                    const duration = ver.thinkingDuration || '';
+                    thinkingHeader.querySelector('span').innerHTML = duration ? 'Thought for ' + duration + 's' : 'Thought for a while';
+                    thinkingHeader.classList.remove('expanded');
+                    thinkingContent.classList.add('collapsed');
+                }
+            } else if (ver.thinking && !thinkingBlock && !ver.content) {
+                // First thinking chunk - need full re-render
+                renderChat();
+                return;
+            }
+
+            // Update markdown content
             const lastBubble = chat.querySelector('.message:last-child .message-bubble');
-            
-            if (lastBubble && lastMsg) {
-                // 只更新markdown内容，不添加光标
-                lastBubble.innerHTML = renderMarkdown(lastMsg.versions[0].content || '');
-                // 重新处理新出现的代码块
+            if (lastBubble) {
+                lastBubble.innerHTML = renderMarkdown(ver.content || '');
                 lastBubble.querySelectorAll('pre code').forEach(block => {
                     const pre = block.parentElement;
                     if (pre.querySelector('.code-header')) return;
@@ -2998,10 +3048,10 @@ function usernameToEmail(username) {
             details.classList.toggle('show');
         }
 
-        function toggleThinking(toggle) {
-            toggle.classList.toggle('expanded');
-            const content = toggle.nextElementSibling;
-            content.classList.toggle('show');
+        function toggleThinking(header) {
+            header.classList.toggle('expanded');
+            const content = header.nextElementSibling;
+            content.classList.toggle('collapsed');
         }
 
         function formatActionIndicator(actions) {
