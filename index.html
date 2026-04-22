@@ -61,6 +61,7 @@
             .input-container { border-radius: 12px; }
             .input-main { padding: 8px; gap: 6px; }
             .input-text { font-size: 16px; }
+            .history-menu-btn { opacity: 0.5; }
             .chats-list-item-info { flex: 1; min-width: 0; }
             .chats-list-item-actions { flex-shrink: 0; }
             .message-content { font-size: 15px; }
@@ -106,7 +107,7 @@
 
         /* 模型选择栏 */
         .model-bar { align-items: center; justify-content: space-between; padding: 8px 20px; border-bottom: 1px solid var(--border); background: var(--bg); position: relative; }
-        .model-bar .model-selector { display: inline-flex; align-items: center; gap: 16px; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text2); border: none; transition: all 0.2s; min-width: auto; max-width: 260px; }
+        .model-bar .model-selector { display: inline-flex; align-items: center; gap: 20px; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 15px; color: var(--text); border: none; transition: all 0.2s; min-width: auto; max-width: 300px; height: 36px; }
         .model-bar .model-selector:hover { background: var(--bg2); }
         .model-bar .model-selector svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
         .model-bar .model-dropdown { position: absolute; top: 100%; left: 20px; margin-top: 8px; background: var(--white); border: 1px solid var(--border); border-radius: 12px; min-width: 280px; max-height: 400px; overflow-y: auto; box-shadow: 0 4px 24px var(--shadow); display: none; z-index: 200; }
@@ -255,8 +256,8 @@
         .model-option { padding: 10px 16px; cursor: pointer; display: flex; flex-direction: column; }
         .model-option:hover { background: var(--bg2); }
         .model-option.active { background: #fff5f2; }
-        .model-option-name { font-size: 14px; font-weight: 500; }
-        .model-option-full { font-size: 12px; color: var(--text3); margin-top: 2px; }
+        .model-option-name { font-size: 15px; font-weight: 500; }
+        .model-option-full { font-size: 11px; color: var(--text3); margin-top: 2px; }
         
         /* 设置弹窗 */
         .settings-section { margin-bottom: 24px; }
@@ -1961,7 +1962,7 @@ function usernameToEmail(username) {
                     return `
                     <div class="model-option ${m.id === currentModelId ? 'active' : ''}" onclick="selectModel('${m.id}')">
                         <div class="model-option-name">${esc(m.short_name || m.model_id)}</div>
-                        ${m.short_name ? `<div class="model-option-full">${esc(m.model_id)}</div>` : ''}
+                        <div class="model-option-full">${esc(getApiName(m.api_id))}</div>
                     </div>
                 `;
                 }).join('');
