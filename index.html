@@ -2906,9 +2906,10 @@ function usernameToEmail(username) {
                 if (!isUser && ver.thinking) {
                     const isStillThinking = isLastStreaming && !ver.thinkingDone;
                     const duration = ver.thinkingDuration || '';
+                    const clockSvg = '<svg class="thinking-clock" viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
                     const headerText = isStillThinking
-                        ? '<span class="thinking-clock"><svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Thinking<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>'
-                        : (duration ? 'Thought for ' + duration + 's' : 'Thought for a while');
+                        ? clockSvg + ' Thinking<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>'
+                        : (duration ? clockSvg + ' Thought for ' + duration + 's' : clockSvg + ' Thought for a while');
                     thinkingHtml = `
                         <div class="thinking-block">
                             <div class="thinking-header${isStillThinking ? ' expanded' : ''}" onclick="toggleThinking(this)">
@@ -2996,7 +2997,8 @@ function usernameToEmail(username) {
                 if (ver.thinkingDone && thinkingHeader) {
                     // Thinking just finished - collapse it
                     const duration = ver.thinkingDuration || '';
-                    thinkingHeader.querySelector('span').innerHTML = duration ? 'Thought for ' + duration + 's' : 'Thought for a while';
+                    const clockSvg = '<svg class="thinking-clock" viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+                    thinkingHeader.querySelector('span').innerHTML = clockSvg + ' ' + (duration ? 'Thought for ' + duration + 's' : 'Thought for a while');
                     thinkingHeader.classList.remove('expanded');
                     thinkingContent.classList.add('collapsed');
                 }
