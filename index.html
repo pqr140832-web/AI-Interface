@@ -120,6 +120,17 @@
         .tts-voice-selector svg { color: var(--text3); flex-shrink: 0; }
         .generated-image { max-width: 100%; max-height: 512px; border-radius: 8px; margin-top: 8px; cursor: pointer; display: block; }
         .generated-audio { width: 100%; margin-top: 8px; border-radius: 8px; }
+        
+        /* 思考过程 */
+        .thinking-block { margin-top: 8px; margin-bottom: 8px; }
+        .thinking-toggle { display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer; font-size: 13px; color: var(--text3); user-select: none; }
+        .thinking-toggle:hover { color: var(--text2); }
+        .thinking-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; transition: transform 0.2s; }
+        .thinking-toggle.expanded svg { transform: rotate(90deg); }
+        .thinking-content { display: none; padding: 10px 14px; margin-top: 4px; background: var(--bg2); border-radius: 10px; font-size: 13px; line-height: 1.6; color: var(--text2); max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+        .thinking-content.show { display: block; }
+        .thinking-spinner { display: inline-block; animation: thinking-spin 1s linear infinite; }
+        @keyframes thinking-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         
         /* 欢迎页 */
@@ -875,11 +886,9 @@ function usernameToEmail(username) {
                             const modelList = await resp.json();
                             const chatModels = (modelList.data || []).filter(m => {
                                 const id = (m.id || '').toLowerCase();
-                                // 只添加对话模型，排除图片生成、TTS、embedding等
-                                if (id.includes('image') || id.includes('dall-e') || id.includes('dalle') || id.includes('flux') || id.includes('stable-diffusion') || id.includes('midjourney') || id.includes('imagen')) return false;
-                                if (id.includes('tts') && !id.includes('stt')) return false;
+                                // 排除embedding和语音识别等不相干的模型
                                 if (id.includes('embedding') || id.includes('embed')) return false;
-                                if (id.includes('whisper') || id.includes('stt')) return false;
+                                if (id.includes('whisper') || (id.includes('stt') && !id.includes('tts'))) return false;
                                 return true;
                             });
                             for (const m of chatModels.slice(0, 30)) {
@@ -2651,6 +2660,7 @@ function usernameToEmail(username) {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let fullContent = '';
+                let fullThinking = '';
                 let toolCalls = [];
 
                 while (true) {
@@ -2668,6 +2678,14 @@ function usernameToEmail(username) {
                             try {
                                 const json = JSON.parse(data);
                                 const delta = json.choices?.[0]?.delta;
+                                
+                                // 处理思考过程（推理模型）
+                                if (delta?.reasoning_content || delta?.reasoning) {
+                                    fullThinking += (delta.reasoning_content || delta.reasoning);
+                                    messages[messages.length - 1].versions[0].thinking = fullThinking;
+                                    renderLastMessage();
+                                    scrollToBottom();
+                                }
                                 
                                 // 处理内容
                                 if (delta?.content) {
@@ -2743,7 +2761,14 @@ function usernameToEmail(username) {
                                 
                                 try {
                                     const json = JSON.parse(data);
-                                    const content = json.choices?.[0]?.delta?.content;
+                                    const delta = json.choices?.[0]?.delta;
+                                    if (delta?.reasoning_content || delta?.reasoning) {
+                                        fullThinking += (delta.reasoning_content || delta.reasoning);
+                                        messages[messages.length - 1].versions[0].thinking = fullThinking;
+                                        renderLastMessage();
+                                        scrollToBottom();
+                                    }
+                                    const content = delta?.content;
                                     if (content) {
                                         fullContent += content;
                                         messages[messages.length - 1].versions[0].content = fullContent;
@@ -2854,11 +2879,27 @@ function usernameToEmail(username) {
                     </div>
                 `;
 
+                // 思考过程（推理模型）
+                let thinkingHtml = '';
+                if (!isUser && ver.thinking) {
+                    const isStillThinking = isLastStreaming && !ver.content;
+                    thinkingHtml = `
+                        <div class="thinking-block">
+                            <div class="thinking-toggle${isStillThinking ? '' : ' expanded'}" onclick="toggleThinking(this)">
+                                <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                <span>${isStillThinking ? '<span class="thinking-spinner">💭</span> 正在思考...' : '已思考 ' + ver.thinking.length + ' 字'}</span>
+                            </div>
+                            <div class="thinking-content${isStillThinking ? '' : ' show'}">${esc(ver.thinking)}</div>
+                        </div>
+                    `;
+                }
+
                 return `
                     <div class="message ${isUser ? 'user' : 'assistant'}">
                         ${avatar}
                         <div class="message-content">
                             <div class="message-role">${esc(roleLabel)}</div>
+                            ${thinkingHtml}
                             ${content}
                             ${aiActionHtml}
                             ${tools}
@@ -2955,6 +2996,12 @@ function usernameToEmail(username) {
         function toggleActionDetails(indicator) {
             const details = indicator.nextElementSibling;
             details.classList.toggle('show');
+        }
+
+        function toggleThinking(toggle) {
+            toggle.classList.toggle('expanded');
+            const content = toggle.nextElementSibling;
+            content.classList.toggle('show');
         }
 
         function formatActionIndicator(actions) {
