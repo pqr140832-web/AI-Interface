@@ -61,7 +61,6 @@
             .input-container { border-radius: 12px; }
             .input-main { padding: 8px; gap: 6px; }
             .input-text { font-size: 16px; }
-            .points-display { font-size: 12px; padding: 4px 10px; }
             .chats-list-item-info { flex: 1; min-width: 0; }
             .chats-list-item-actions { flex-shrink: 0; }
             .message-content { font-size: 15px; }
@@ -111,8 +110,6 @@
         .model-bar .model-selector:hover { background: var(--bg2); }
         .model-bar .model-selector svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
         .model-bar .model-dropdown { position: absolute; top: 100%; left: 20px; margin-top: 8px; background: var(--white); border: 1px solid var(--border); border-radius: 12px; min-width: 280px; max-height: 400px; overflow-y: auto; box-shadow: 0 4px 24px var(--shadow); display: none; z-index: 200; }
-        .points-display { font-size: 14px; color: var(--text2); display: flex; align-items: center; gap: 6px; cursor: default; padding: 8px 16px; border: 1px solid var(--border); border-radius: 10px; }
-        .points-display .points-low { color: #dc3545; font-weight: 600; }
         .model-option-cost { font-size: 11px; color: var(--text3); margin-top: 2px; }
         .model-option.active .model-option-cost { color: var(--accent2); }
 
@@ -507,7 +504,6 @@
                     <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </div>
                 <div class="model-dropdown" id="modelDropdown"></div>
-                <div class="points-display" id="pointsDisplay" title="每日积分 · 0点(UTC+8)重置">⚡ <span id="pointsCount">20</span>分</div>
             </div>
             <header class="mobile-header">
                 <div class="mobile-menu-btn" id="mobileMenuBtn">
@@ -585,21 +581,6 @@
                 </button>
             </div>
             <div class="modal-body">
-                <div class="settings-section">
-                    <div class="settings-section-title">⚡ 积分</div>
-                    <div class="settings-item">
-                        <div>
-                            <span class="settings-label">今日剩余积分</span>
-                            <div class="settings-desc">每日 0 点(UTC+8) 重置为 20 分</div>
-                        </div>
-                        <span style="font-size: 18px; font-weight: 600; color: var(--accent);" id="settingsPoints">20</span>
-                    </div>
-                    <div class="settings-item">
-                        <span class="settings-label">累计已用积分</span>
-                        <span style="font-size: 14px; color: var(--text2);" id="settingsTotalUsed">0</span>
-                    </div>
-                </div>
-
                 <div class="settings-section">
                     <div class="settings-section-title">界面设置</div>
                     <div class="settings-item">
@@ -833,23 +814,7 @@ function usernameToEmail(username) {
             enableHistorySearch: true
         };
 
-        // ==================== 积分系统 ====================
-        let userPoints = { points: 20, last_reset: null, total_used: 0 };
-
-        const MODEL_COSTS = {
-            'opus': 4, 'o1': 4, 'o3': 4,
-            'haiku': 1, 'flash': 1, 'mini': 1, 'nano': 1, 'micro': 1,
-        };
-
-        function getModelCost(model) {
-            const modelId = (model.model_id || model.id || model.name || '').toLowerCase();
-            // 优先匹配更长的关键词（避免 mini 被 in 匹配等）
-            for (const [keyword, cost] of Object.entries(MODEL_COSTS)) {
-                if (modelId.includes(keyword)) return cost;
-            }
-            return 2; // 默认2分
-        }
-
+        // ==================== API 辅助函数 ====================
         function isOwnApi(model) {
             return savedApis.some(api => api.id === model.api_id);
         }
@@ -870,8 +835,8 @@ function usernameToEmail(username) {
             const existing = savedApis.find(a => a.name === BUILT_IN_API_NAME);
             if (existing) return;
             try {
-                const BUILT_IN_URL = 'https://api.gptsapi.net/v1';
-                const BUILT_IN_KEY = 'sk-uyg016df185d871d2f99e0ad63fee3900f3a225ba44mdRzJ';
+                const BUILT_IN_URL = 'https://api.242243.xyz/v1';
+                const BUILT_IN_KEY = 'sk-OzUi5pXO9jDEv755LM2YmgOZ3D706a0hEfWUBN6zW9sUOCVw';
                 const { data: apiData } = await sb.from('user_apis').insert({
                     user_id: currentUser.id,
                     name: BUILT_IN_API_NAME,
@@ -910,64 +875,7 @@ function usernameToEmail(username) {
             }
         }
 
-        async function loadUserPoints() {
-            if (!currentUser) return;
-            try {
-                const { data } = await sb.from('user_points').select('*').eq('user_id', currentUser.id).single();
-                if (data) {
-                    const now = new Date();
-                    const utc8 = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-                    const lastReset = data.last_reset ? new Date(data.last_reset) : null;
-                    const lastResetUtc8 = lastReset ? new Date(lastReset.getTime() + 8 * 60 * 60 * 1000) : null;
-                    if (!lastResetUtc8 || lastResetUtc8.toDateString() !== utc8.toDateString()) {
-                        userPoints.points = 20;
-                        userPoints.last_reset = now.toISOString();
-                        userPoints.total_used = data.total_used || 0;
-                        await sb.from('user_points').upsert({
-                            user_id: currentUser.id, points: 20, last_reset: now.toISOString(), total_used: userPoints.total_used
-                        });
-                    } else {
-                        userPoints = { points: data.points, last_reset: data.last_reset, total_used: data.total_used || 0 };
-                    }
-                } else {
-                    userPoints = { points: 20, last_reset: new Date().toISOString(), total_used: 0 };
-                    await sb.from('user_points').insert({
-                        user_id: currentUser.id, points: 20, last_reset: new Date().toISOString(), total_used: 0
-                    });
-                }
-                updatePointsDisplay();
-            } catch (err) {
-                console.error('Load points error:', err);
-                userPoints = { points: 20, last_reset: new Date().toISOString(), total_used: 0 };
-                updatePointsDisplay();
-            }
-        }
-
-        async function deductPoints(cost) {
-            userPoints.points -= cost;
-            userPoints.total_used += cost;
-            try {
-                await sb.from('user_points').upsert({
-                    user_id: currentUser.id,
-                    points: userPoints.points,
-                    last_reset: userPoints.last_reset,
-                    total_used: userPoints.total_used
-                });
-            } catch (err) { console.error('Save points error:', err); }
-            updatePointsDisplay();
-        }
-
-        function updatePointsDisplay() {
-            const el = document.getElementById('pointsCount');
-            if (el) {
-                el.textContent = userPoints.points;
-                el.className = userPoints.points <= 3 ? 'points-low' : '';
-            }
-            const sp = document.getElementById('settingsPoints');
-            if (sp) sp.textContent = userPoints.points;
-            const st = document.getElementById('settingsTotalUsed');
-            if (st) st.textContent = userPoints.total_used;
-        }
+        // 积分系统已移除
 
 
 
@@ -1219,7 +1127,7 @@ function usernameToEmail(username) {
             $('userAvatar').textContent = currentUser.username[0].toUpperCase();
             await loadUserData();
             await loadUserMemories();
-            await loadUserPoints();
+            // 积分系统已移除
             updateUI();
             showWelcomeView();
         }
@@ -2002,12 +1910,10 @@ function usernameToEmail(username) {
             }
             
             list.innerHTML = histories.slice(0, 15).map(h => {
-                const lastModelId = getLastAssistantModelId(h.messages);
-                const modelName = lastModelId ? getModelDisplayName(lastModelId) : '';
                 return `
                 <div class="history-item ${h.id === currentHistoryId ? 'active' : ''}" onclick="loadHistory('${h.id}')">
                     <div class="history-info">
-                        <div class="history-title">${esc(h.title || '未命名')}${modelName ? ' · ' + esc(modelName) : ''}</div>
+                        <div class="history-title">${esc(h.title || '未命名')}</div>
                         <div class="history-time">${formatTime(h.updated_at)}</div>
                     </div>
                     <div class="history-menu-btn" onclick="event.stopPropagation();showHistoryMenu(event, '${h.id}')">
@@ -2052,13 +1958,10 @@ function usernameToEmail(username) {
             for (const [apiName, modelList] of Object.entries(groups)) {
                 html += `<div class="model-group-title">${esc(apiName)}</div>`;
                 html += modelList.map(m => {
-                    const cost = isOwnApi(m) ? 0 : getModelCost(m);
-                    const costText = isOwnApi(m) ? '免费(' + esc(getApiName(m.api_id)) + ')' : cost + '分/次';
                     return `
                     <div class="model-option ${m.id === currentModelId ? 'active' : ''}" onclick="selectModel('${m.id}')">
                         <div class="model-option-name">${esc(m.short_name || m.model_id)}</div>
                         ${m.short_name ? `<div class="model-option-full">${esc(m.model_id)}</div>` : ''}
-                        <div class="model-option-cost">${costText}</div>
                     </div>
                 `;
                 }).join('');
@@ -2159,12 +2062,10 @@ function usernameToEmail(username) {
             }
             
             list.innerHTML = histories.map(h => {
-                const chatModelId = getLastAssistantModelId(h.messages);
-                const chatModelName = chatModelId ? getModelDisplayName(chatModelId) : '';
                 return `
                 <div class="chats-list-item" onclick="loadHistory('${h.id}')">
                     <div class="chats-list-item-info">
-                        <div class="chats-list-item-title">${esc(h.title || '未命名')}${chatModelName ? ' · ' + esc(chatModelName) : ''}</div>
+                        <div class="chats-list-item-title">${esc(h.title || '未命名')}</div>
                         <div class="chats-list-item-time">${formatFullTime(h.updated_at)}</div>
                     </div>
                     <div class="chats-list-item-actions">
@@ -2467,15 +2368,6 @@ function usernameToEmail(username) {
                 return;
             }
 
-            // 检查积分（使用自有 API 不扣分）
-            if (!isOwnApi(model)) {
-                const cost = getModelCost(model);
-                if (userPoints.points < cost) {
-                    toast('积分不足！今日积分已用完，明天0点重置。或添加自己的API Key。');
-                    return;
-                }
-            }
-
             // 添加用户消息
             messages.push({
                 role: 'user',
@@ -2714,11 +2606,6 @@ function usernameToEmail(username) {
             isStreaming = false;
             updateSendButton();
             saveHistory();
-
-            // 成功完成后扣除积分（使用自有 API 不扣分）
-            if (!isOwnApi(model)) {
-                await deductPoints(getModelCost(model));
-            }
         }
 
         function stopGeneration() {
