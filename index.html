@@ -113,11 +113,6 @@
         .model-bar .model-dropdown { position: absolute; top: 100%; left: 20px; margin-top: 8px; background: var(--white); border: 1px solid var(--border); border-radius: 12px; min-width: 280px; max-height: 400px; overflow-y: auto; box-shadow: 0 4px 24px var(--shadow); display: none; z-index: 200; }
         .model-option-cost { font-size: 11px; color: var(--text3); margin-top: 2px; }
         .model-option.active .model-option-cost { color: var(--accent2); }
-        .tts-voice-selector { display: none; align-items: center; gap: 6px; margin-left: 12px; }
-        .tts-voice-selector.show { display: inline-flex; }
-        .tts-voice-selector select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--white); color: var(--text); outline: none; cursor: pointer; }
-        .tts-voice-selector select:focus { border-color: var(--accent); }
-        .tts-voice-selector svg { color: var(--text3); flex-shrink: 0; }
         .generated-image { max-width: 100%; max-height: 512px; border-radius: 8px; margin-top: 8px; cursor: pointer; display: block; }
         .generated-audio { width: 100%; margin-top: 8px; border-radius: 8px; }
 
@@ -512,17 +507,6 @@
                     <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </div>
                 <div class="model-dropdown" id="modelDropdown"></div>
-                <div class="tts-voice-selector" id="ttsVoiceSelector">
-                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-                    <select id="ttsVoiceSelect">
-                        <option value="alloy">Alloy</option>
-                        <option value="echo">Echo</option>
-                        <option value="fable">Fable</option>
-                        <option value="onyx">Onyx</option>
-                        <option value="nova">Nova</option>
-                        <option value="shimmer">Shimmer</option>
-                    </select>
-                </div>
             </div>
             <header class="mobile-header">
                 <div class="mobile-menu-btn" id="mobileMenuBtn">
@@ -1999,14 +1983,6 @@ function usernameToEmail(username) {
             currentModelId = id;
             updateModelDropdown();
             $('modelDropdown').classList.remove('show');
-            // 显示/隐藏TTS声音选择器
-            const model = models.find(m => m.id === id);
-            const ttsSelector = $('ttsVoiceSelector');
-            if (model && isTTSModel(model)) {
-                ttsSelector.classList.add('show');
-            } else {
-                ttsSelector.classList.remove('show');
-            }
         }
 
         // ==================== 侧边栏 ====================
@@ -2493,9 +2469,15 @@ function usernameToEmail(username) {
             // ========== TTS 语音合成模型 ==========
             if (isTTSModel(model)) {
                 if (!text) { toast('请输入要转换的文字'); return; }
-                const voice = $('ttsVoiceSelect')?.value || 'alloy';
+                // 解析声音参数，格式: "voice: 要转的文字" 或直接文字（默认alloy）
+                const ttsVoiceMatch = text.match(/^(\w+)\s*[:：]\s*([\s\S]+)$/);
+                const voice = ttsVoiceMatch ? ttsVoiceMatch[1].toLowerCase() : 'alloy';
+                const ttsText = ttsVoiceMatch ? ttsVoiceMatch[2].trim() : text;
+                if (!ttsText) { toast('请输入要转换的文字'); return; }
+                const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+                const finalVoice = validVoices.includes(voice) ? voice : 'alloy';
                 messages.push({ role: 'user', versions: [{ content: text, files: [...attachedFiles] }], current: 0 });
-                messages.push({ role: 'assistant', versions: [{ content: '正在生成语音... (' + voice + ')', aiActions: [] }], current: 0, modelId: model.id });
+                messages.push({ role: 'assistant', versions: [{ content: '正在生成语音... (' + finalVoice + ')', aiActions: [] }], current: 0, modelId: model.id });
                 input.value = '';
                 input.style.height = 'auto';
                 attachedFiles = [];
@@ -2506,8 +2488,8 @@ function usernameToEmail(username) {
                 isStreaming = true;
                 updateSendButton();
                 try {
-                    const audioUrl = await sendTTSRequest(model, text, voice);
-                    messages[messages.length - 1].versions[0].content = '语音 (' + voice + ')';
+                    const audioUrl = await sendTTSRequest(model, ttsText, finalVoice);
+                    messages[messages.length - 1].versions[0].content = '语音 (' + finalVoice + ')';
                     messages[messages.length - 1].versions[0].audioUrl = audioUrl;
                     renderChat();
                 } catch (err) {
