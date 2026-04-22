@@ -866,24 +866,41 @@ function usernameToEmail(username) {
                 }).select().single();
                 if (apiData) {
                     savedApis.push(apiData);
-                    const defaultModels = [
-                        { model_id: 'gpt-4o-mini', short_name: 'GPT-4o Mini' },
-                        { model_id: 'claude-3-5-haiku-20241022', short_name: 'Claude 3.5 Haiku' },
-                        { model_id: 'deepseek-chat', short_name: 'DeepSeek Chat' }
-                    ];
-                    for (const m of defaultModels) {
-                        const { data: modelData } = await sb.from('user_models').insert({
-                            user_id: currentUser.id,
-                            api_id: apiData.id,
-                            api_name: BUILT_IN_API_NAME,
-                            api_url: BUILT_IN_URL,
-                            api_key: BUILT_IN_KEY,
-                            model_id: m.model_id,
-                            short_name: m.short_name,
-                            supports_vision: true,
-                            supports_tools: true
-                        }).select().single();
-                        if (modelData) models.push(modelData);
+                    // 自动获取小鸡农场的模型列表
+                    try {
+                        const resp = await fetch(BUILT_IN_URL + '/models', {
+                            headers: { 'Authorization': 'Bearer ' + BUILT_IN_KEY }
+                        });
+                        if (resp.ok) {
+                            const modelList = await resp.json();
+                            const chatModels = (modelList.data || []).filter(m => {
+                                const id = (m.id || '').toLowerCase();
+                                // 只添加对话模型，排除图片生成、TTS、embedding等
+                                if (id.includes('image') || id.includes('dall-e') || id.includes('dalle') || id.includes('flux') || id.includes('stable-diffusion') || id.includes('midjourney') || id.includes('imagen')) return false;
+                                if (id.includes('tts') && !id.includes('stt')) return false;
+                                if (id.includes('embedding') || id.includes('embed')) return false;
+                                if (id.includes('whisper') || id.includes('stt')) return false;
+                                return true;
+                            });
+                            for (const m of chatModels.slice(0, 30)) {
+                                // 避免重复插入
+                                if (models.find(existing => existing.model_id === m.id)) continue;
+                                const { data: modelData } = await sb.from('user_models').insert({
+                                    user_id: currentUser.id,
+                                    api_id: apiData.id,
+                                    api_name: BUILT_IN_API_NAME,
+                                    api_url: BUILT_IN_URL,
+                                    api_key: BUILT_IN_KEY,
+                                    model_id: m.id,
+                                    short_name: m.id.split('/').pop(),
+                                    supports_vision: true,
+                                    supports_tools: true
+                                }).select().single();
+                                if (modelData) models.push(modelData);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('获取模型列表失败:', e);
                     }
                     if (!currentModelId && models.length) {
                         currentModelId = models[0].id;
