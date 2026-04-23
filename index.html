@@ -2958,8 +2958,8 @@ function usernameToEmail(username) {
                         <div class="code-export-menu">
                             <div onclick="exportCodeAs(this, 'txt')">TXT</div>
                             <div onclick="exportCodeAs(this, 'word')">Word</div>
-                            <div onclick="exportCodeAs(this, 'html')">HTML</div>
-                            <div onclick="exportCodeAs(this, 'code')">${lang ? lang.toUpperCase() + ' 文件' : '代码文件'}</div>
+                            <div onclick="exportCodeAs(this, 'code')">${lang ? lang.toUpperCase() : 'CODE'}</div>
+                            <div onclick="exportCodeAs(this, 'pdf')">PDF</div>
                         </div>
                     </div>
                 `;
@@ -3032,8 +3032,8 @@ function usernameToEmail(username) {
                             <div class="code-export-menu">
                                 <div onclick="exportCodeAs(this, 'txt')">TXT</div>
                                 <div onclick="exportCodeAs(this, 'word')">Word</div>
-                                <div onclick="exportCodeAs(this, '${langLower === 'html' ? 'html' : 'pdf'}')">${langLower === 'html' ? 'HTML' : 'PDF'}</div>
-                                <div onclick="exportCodeAs(this, 'code')">${lang ? lang.toUpperCase() + ' 文件' : '代码文件'}</div>
+                                <div onclick="exportCodeAs(this, 'code')">${lang ? lang.toUpperCase() : 'CODE'}</div>
+                                <div onclick="exportCodeAs(this, 'pdf')">PDF</div>
                             </div>
                         </div>`;
                     if (langLower === 'html') {
