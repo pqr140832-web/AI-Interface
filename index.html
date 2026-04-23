@@ -727,9 +727,10 @@
             删除
         </div>
     </div>
-    <div class="export-menu-popup" id="exportMenuPopup" style="position:fixed;background:var(--white);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px var(--shadow);z-index:500;display:none;min-width:120px;overflow:hidden">
-        <div style="padding:10px 16px;cursor:pointer;font-size:14px" onclick="exportChat('txt')">导出为 TXT</div>
-        <div style="padding:10px 16px;cursor:pointer;font-size:14px" onclick="exportChat('word')">导出为 Word</div>
+    <div class="export-menu-popup" id="exportMenuPopup" style="position:fixed;background:var(--white);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px var(--shadow);z-index:500;display:none;min-width:150px;overflow:hidden">
+        <div style="padding:10px 16px;cursor:pointer;font-size:14px;color:var(--text);transition:background 0.15s" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background='transparent'" onclick="exportChat('txt')">导出为 TXT</div>
+        <div style="padding:10px 16px;cursor:pointer;font-size:14px;color:var(--text);transition:background 0.15s" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background='transparent'" onclick="exportChat('word')">导出为 Word</div>
+        <div style="padding:10px 16px;cursor:pointer;font-size:14px;color:var(--text);transition:background 0.15s" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background='transparent'" onclick="exportChat('html')">导出为 HTML</div>
     </div>
 
     <!-- HTML 预览弹窗 -->
@@ -1040,6 +1041,22 @@ function usernameToEmail(username) {
             menu.style.left = '50%';
             menu.style.transform = 'translate(-50%, -50%)';
             menu.style.display = 'block';
+            // Add backdrop and click-outside-to-close
+            if (!menu._backdrop) {
+                const backdrop = document.createElement('div');
+                backdrop.style.cssText = 'position:fixed;inset:0;z-index:499;';
+                backdrop.onclick = () => { menu.style.display = 'none'; };
+                menu._backdrop = backdrop;
+                menu.parentNode.insertBefore(backdrop, menu);
+            }
+            menu._backdrop.style.display = 'block';
+            // Hide backdrop when menu is closed
+            const observer = new MutationObserver(() => {
+                if (menu.style.display === 'none') {
+                    menu._backdrop.style.display = 'none';
+                }
+            });
+            observer.observe(menu, { attributes: true, attributeFilter: ['style'] });
         }
 
         function exportChat(format) {
@@ -1066,6 +1083,16 @@ function usernameToEmail(username) {
                 htmlContent += '</body></html>';
                 const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
                 downloadBlob(blob, `${h.title}.doc`);
+            } else if (format === 'html') {
+                let htmlContent = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(h.title)}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:800px;margin:0 auto;padding:20px;line-height:1.8;color:#333;}.msg{margin:16px 0;padding:12px 16px;border-radius:12px;}.user{background:#f0f0f0;}.assistant{background:#fff8f5;}.role{font-weight:600;margin-bottom:4px;font-size:14px;color:#555;}.time{color:#999;font-size:12px;margin-bottom:4px;}.content{white-space:pre-wrap;word-break:break-word;}</style></head><body><h1>${esc(h.title)}</h1><p style="color:#999;">导出时间: ${new Date().toLocaleString('zh-CN')}</p><hr>`;
+                msgs.forEach(m => {
+                    const role = m.role === 'user' ? (settings.exportUserName || '用户') : 'AI';
+                    const content = m.versions?.[m.current]?.content || '';
+                    htmlContent += `<div class="msg ${m.role}"><div class="role">${role}</div><div class="content">${esc(latexToUnicode(content))}</div></div>`;
+                });
+                htmlContent += '</body></html>';
+                const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                downloadBlob(blob, `${h.title}.html`);
             }
             toast('已导出');
         }
@@ -2959,14 +2986,14 @@ function usernameToEmail(username) {
                             <div onclick="exportCodeAs(this, 'txt')">TXT</div>
                             <div onclick="exportCodeAs(this, 'word')">Word</div>
                             <div onclick="exportCodeAs(this, 'code')">${lang ? lang.toUpperCase() : 'CODE'}</div>
-                            <div onclick="exportCodeAs(this, 'pdf')">PDF</div>
+                            <div onclick="exportCodeAs(this, 'html')">HTML</div>
                         </div>
                     </div>
                 `;
                 if (langLower === 'html') {
                     actionBtns += `
-                    <button class="code-btn" onclick="runHtmlCode(this)" title="运行 HTML">
-                        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/></svg>
+                    <button class="code-btn" onclick="runHtmlCode(this)" title="运行 HTML" style="color:var(--text2)">
+                        <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     </button>`;
                 }
 
@@ -3033,11 +3060,11 @@ function usernameToEmail(username) {
                                 <div onclick="exportCodeAs(this, 'txt')">TXT</div>
                                 <div onclick="exportCodeAs(this, 'word')">Word</div>
                                 <div onclick="exportCodeAs(this, 'code')">${lang ? lang.toUpperCase() : 'CODE'}</div>
-                                <div onclick="exportCodeAs(this, 'pdf')">PDF</div>
+                                <div onclick="exportCodeAs(this, 'html')">HTML</div>
                             </div>
                         </div>`;
                     if (langLower === 'html') {
-                        actionBtns += `<button class="code-btn" onclick="runHtmlCode(this)" title="运行 HTML"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/></svg></button>`;
+                        actionBtns += `<button class="code-btn" onclick="runHtmlCode(this)" title="运行 HTML" style="color:var(--text2)"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>`;
                     }
                     const header = document.createElement('div');
                     header.className = 'code-header';
