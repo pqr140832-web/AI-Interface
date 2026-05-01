@@ -2473,41 +2473,220 @@ function usernameToEmail(username) {
             return id.includes('image') || id.includes('dall-e') || id.includes('dalle') || id.includes('flux') || id.includes('stable-diffusion') || id.includes('midjourney') || id.includes('imagen') || id.includes('sd ');
         }
 
+        function isGptImageModel(model) {
+            const id = (model.model_id || '').toLowerCase();
+            return id.includes('gpt-image') || id.includes('gpt-image-2') || id.includes('gpt-image-1');
+        }
+
+        function isGeminiImageModel(model) {
+            const id = (model.model_id || '').toLowerCase();
+            return id.includes('gemini') && (id.includes('image'));
+        }
+
         function isTTSModel(model) {
             const id = (model.model_id || '').toLowerCase();
             return id.includes('tts') && !id.includes('stt');
         }
 
-        async function sendImageRequest(model, prompt) {
-            const response = await fetch(model.api_url.replace(/\/$/, '') + '/images/generations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + model.api_key
-                },
-                body: JSON.stringify({
-                    model: model.model_id,
-                    prompt: prompt,
-                    n: 1,
-                    size: '1024x1024',
-                    response_format: 'b64_json'
-                })
-            });
+        // 上传图片到临时图床（用于图生图）
+        async function uploadImageToTempHost(base64Data) {
+            try {
+                const resp = await fetch('https://telegra.ph/upload', {
+                    method: 'POST',
+                    body: base64Data.includes('base64,')
+                        ? await (await fetch(base64Data)).blob()
+                        : await (await fetch('data:image/png;base64,' + base64Data)).blob()
+                });
+                const json = await resp.json();
+                if (json[0]?.src) return 'https://telegra.ph' + json[0].src;
+            } catch (e) {
+                console.warn('telegra.ph上传失败，尝试imgbb:', e);
+            }
+            try {
+                const resp = await fetch('https://api.imgbb.com/1/upload?key=demo', {
+                    method: 'POST',
+                    body: (() => {
+                        const fd = new FormData();
+                        fd.append('image', base64Data);
+                        return fd;
+                    })()
+                });
+                const json = await resp.json();
+                if (json.data?.url) return json.data.url;
+            } catch (e) {
+                console.warn('imgbb上传失败:', e);
+            }
+            throw new Error('图片上传失败，无法进行图生图');
+        }
 
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error('图片生成失败: ' + (err.error?.message || response.status));
+        // 检测API是否为gptsapi（需要异步流程）
+        function isGptsapi(apiUrl) {
+            const url = (apiUrl || '').toLowerCase();
+            return url.includes('gptsapi');
+        }
+
+        // GPT Image系列 - gptsapi异步流程
+        async function sendGptImageRequest(model, prompt, imageUrls) {
+            const baseUrl = model.api_url.replace(/\/$/, '');
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + model.api_key
+            };
+
+            // 判断是文本生图还是图生图
+            const endpoint = imageUrls && imageUrls.length > 0
+                ? `${baseUrl}/api/v3/openai/${model.model_id}/image-edit`
+                : `${baseUrl}/api/v3/openai/${model.model_id}/text-to-image`;
+
+            const body = { prompt: prompt, n: 1 };
+            if (imageUrls && imageUrls.length > 0) body.images = imageUrls;
+
+            const resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error('图片生成失败: ' + (err.error?.message || resp.status));
             }
 
-            const data = await response.json();
-            if (data.data && data.data[0]) {
-                if (data.data[0].b64_json) {
-                    return 'data:image/png;base64,' + data.data[0].b64_json;
-                } else if (data.data[0].url) {
-                    return data.data[0].url;
+            const submitData = await resp.json();
+            const resultId = submitData.result_id;
+            if (!resultId) throw new Error('未获取到任务ID');
+
+            // 轮询等待结果
+            for (let i = 0; i < 60; i++) {
+                await new Promise(r => setTimeout(r, 3000));
+                const pollResp = await fetch(`${baseUrl}/api/v3/predictions/${resultId}/result`, { headers });
+                if (!pollResp.ok) continue;
+                const pollData = await pollResp.json();
+                if (pollData.status === 'completed' && pollData.outputs?.[0]) {
+                    return 'data:image/png;base64,' + pollData.outputs[0];
+                }
+                if (pollData.status === 'failed') {
+                    throw new Error('图片生成失败: ' + (pollData.error || '未知错误'));
                 }
             }
+            throw new Error('图片生成超时（3分钟）');
+        }
+
+        // GPT Image系列 - 标准OpenAI接口
+        async function sendGptImageStandard(model, prompt, imageUrls) {
+            const url = model.api_url.replace(/\/$/, '') + '/images/generations';
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + model.api_key
+            };
+            const body = { model: model.model_id, prompt: prompt, n: 1, size: '1024x1024', response_format: 'b64_json' };
+
+            const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error('图片生成失败: ' + (err.error?.message || resp.status));
+            }
+            const data = await resp.json();
+            if (data.data?.[0]) {
+                if (data.data[0].b64_json) return 'data:image/png;base64,' + data.data[0].b64_json;
+                if (data.data[0].url) return data.data[0].url;
+            }
             throw new Error('未生成图片');
+        }
+
+        // Gemini Image系列 - 通过chat/completions接口
+        async function sendGeminiImageRequest(model, prompt, imageUrls) {
+            const url = model.api_url.replace(/\/$/, '') + '/chat/completions';
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + model.api_key
+            };
+
+            const content = [];
+            if (imageUrls && imageUrls.length > 0) {
+                for (const imgUrl of imageUrls) {
+                    content.push({ type: 'image_url', image_url: { url: imgUrl } });
+                }
+            }
+            content.push({ type: 'text', text: prompt });
+
+            const body = {
+                model: model.model_id,
+                messages: [{ role: 'user', content: content }]
+            };
+
+            const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error('图片生成失败: ' + (err.error?.message || resp.status));
+            }
+            const data = await resp.json();
+            // Gemini返回的图片可能是URL或base64
+            const msgContent = data.choices?.[0]?.message?.content;
+            if (!msgContent) throw new Error('未获取到生成结果');
+
+            // 如果返回的是图片URL
+            if (msgContent.startsWith('http://') || msgContent.startsWith('https://')) {
+                return msgContent;
+            }
+            // 如果返回的是base64
+            if (msgContent.includes('base64,')) {
+                return msgContent;
+            }
+            // 如果是markdown图片格式
+            const imgMatch = msgContent.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+            if (imgMatch) return imgMatch[1];
+
+            throw new Error('无法解析生成的图片');
+        }
+
+        // 标准图片生成接口（DALL-E, FLUX等）
+        async function sendStandardImageRequest(model, prompt) {
+            const url = model.api_url.replace(/\/$/, '') + '/images/generations';
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + model.api_key
+            };
+            const body = {
+                model: model.model_id,
+                prompt: prompt,
+                n: 1,
+                size: '1024x1024',
+                response_format: 'b64_json'
+            };
+
+            const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error('图片生成失败: ' + (err.error?.message || resp.status));
+            }
+            const data = await resp.json();
+            if (data.data?.[0]) {
+                if (data.data[0].b64_json) return 'data:image/png;base64,' + data.data[0].b64_json;
+                if (data.data[0].url) return data.data[0].url;
+            }
+            throw new Error('未生成图片');
+        }
+
+        // 统一图片生成入口
+        async function sendImageRequest(model, prompt, attachedImageFiles) {
+            let imageUrls = [];
+            // 如果有附件图片，先上传到临时图床
+            if (attachedImageFiles && attachedImageFiles.length > 0) {
+                for (const f of attachedImageFiles) {
+                    if (f.type?.startsWith('image/') && f.data) {
+                        const url = await uploadImageToTempHost(f.data);
+                        imageUrls.push(url);
+                    }
+                }
+            }
+
+            if (isGptImageModel(model)) {
+                if (isGptsapi(model.api_url)) {
+                    return await sendGptImageRequest(model, prompt, imageUrls.length > 0 ? imageUrls : null);
+                } else {
+                    return await sendGptImageStandard(model, prompt, imageUrls);
+                }
+            } else if (isGeminiImageModel(model)) {
+                return await sendGeminiImageRequest(model, prompt, imageUrls.length > 0 ? imageUrls : null);
+            } else {
+                return await sendStandardImageRequest(model, prompt);
+            }
         }
 
         async function sendTTSRequest(model, text, voice) {
@@ -2547,8 +2726,10 @@ function usernameToEmail(username) {
 
             // ========== 图片生成模型 ==========
             if (isImageModel(model)) {
-                if (!text) { toast('请输入图片描述'); return; }
-                messages.push({ role: 'user', versions: [{ content: text, files: [...attachedFiles] }], current: 0 });
+                if (!text && !attachedFiles.length) { toast('请输入图片描述或上传参考图片'); return; }
+                // 提取附件中的图片文件
+                const imageFiles = attachedFiles.filter(f => f.type?.startsWith('image/'));
+                messages.push({ role: 'user', versions: [{ content: text || '请参考此图片生成', files: [...attachedFiles] }], current: 0 });
                 messages.push({ role: 'assistant', versions: [{ content: '正在生成图片...', aiActions: [] }], current: 0, modelId: model.id });
                 input.value = '';
                 input.style.height = 'auto';
@@ -2560,7 +2741,7 @@ function usernameToEmail(username) {
                 isStreaming = true;
                 updateSendButton();
                 try {
-                    const imageUrl = await sendImageRequest(model, text);
+                    const imageUrl = await sendImageRequest(model, text || 'Generate based on this image', imageFiles.length > 0 ? imageFiles : null);
                     messages[messages.length - 1].versions[0].content = '';
                     messages[messages.length - 1].versions[0].imageGenerated = imageUrl;
                     renderChat();
