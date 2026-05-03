@@ -2519,57 +2519,117 @@ function usernameToEmail(username) {
             throw new Error('图片上传失败，无法进行图生图');
         }
 
-        // 检测API是否为gptsapi（需要异步流程）
+        // 检测API是否为gptsapi
         function isGptsapi(apiUrl) {
             const url = (apiUrl || '').toLowerCase();
             return url.includes('gptsapi');
         }
 
-        // GPT Image系列 - gptsapi异步流程
-        async function sendGptImageRequest(model, prompt, imageUrls) {
+        // GPT Image系列 - gptsapi标准OpenAI图片接口
+        async function sendGptImageRequest(model, prompt, attachedImageFiles) {
             const baseUrl = model.api_url.replace(/\/$/, '');
+
+            // 图生图 - 使用 /images/edits 接口（multipart/form-data）
+            if (attachedImageFiles && attachedImageFiles.length > 0) {
+                const url = baseUrl + '/images/edits';
+                const formData = new FormData();
+                formData.append('model', model.model_id);
+                formData.append('prompt', prompt);
+                formData.append('size', '1024x1024');
+
+                for (const f of attachedImageFiles) {
+                    if (f.data) {
+                        const blob = f.data.includes('base64,')
+                            ? await (await fetch(f.data)).blob()
+                            : await (await fetch('data:image/png;base64,' + f.data)).blob();
+                        formData.append('image', blob, f.name || 'image.png');
+                    }
+                }
+
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + model.api_key },
+                    body: formData
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error('图片编辑失败: ' + (err.error?.message || resp.status));
+                }
+                const data = await resp.json();
+                if (data.data?.[0]) {
+                    if (data.data[0].b64_json) return 'data:image/png;base64,' + data.data[0].b64_json;
+                    if (data.data[0].url) return data.data[0].url;
+                }
+                throw new Error('未生成图片');
+            }
+
+            // 文生图 - 使用 /images/generations 接口
+            const url = baseUrl + '/images/generations';
             const headers = {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + model.api_key
             };
+            const body = {
+                model: model.model_id,
+                prompt: prompt,
+                n: 1,
+                size: '1024x1024',
+                response_format: 'b64_json'
+            };
 
-            // 判断是文本生图还是图生图
-            const endpoint = imageUrls && imageUrls.length > 0
-                ? `${baseUrl}/api/v3/openai/${model.model_id}/image-edit`
-                : `${baseUrl}/api/v3/openai/${model.model_id}/text-to-image`;
-
-            const body = { prompt: prompt, n: 1 };
-            if (imageUrls && imageUrls.length > 0) body.images = imageUrls;
-
-            const resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
+            const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
                 throw new Error('图片生成失败: ' + (err.error?.message || resp.status));
             }
-
-            const submitData = await resp.json();
-            const resultId = submitData.result_id;
-            if (!resultId) throw new Error('未获取到任务ID');
-
-            // 轮询等待结果
-            for (let i = 0; i < 60; i++) {
-                await new Promise(r => setTimeout(r, 3000));
-                const pollResp = await fetch(`${baseUrl}/api/v3/predictions/${resultId}/result`, { headers });
-                if (!pollResp.ok) continue;
-                const pollData = await pollResp.json();
-                if (pollData.status === 'completed' && pollData.outputs?.[0]) {
-                    return 'data:image/png;base64,' + pollData.outputs[0];
-                }
-                if (pollData.status === 'failed') {
-                    throw new Error('图片生成失败: ' + (pollData.error || '未知错误'));
-                }
+            const data = await resp.json();
+            if (data.data?.[0]) {
+                if (data.data[0].b64_json) return 'data:image/png;base64,' + data.data[0].b64_json;
+                if (data.data[0].url) return data.data[0].url;
             }
-            throw new Error('图片生成超时（3分钟）');
+            throw new Error('未生成图片');
         }
 
-        // GPT Image系列 - 标准OpenAI接口
-        async function sendGptImageStandard(model, prompt, imageUrls) {
-            const url = model.api_url.replace(/\/$/, '') + '/images/generations';
+        // GPT Image系列 - 标准OpenAI接口（非gptsapi）
+        async function sendGptImageStandard(model, prompt, attachedImageFiles) {
+            const baseUrl = model.api_url.replace(/\/$/, '');
+
+            // 图生图
+            if (attachedImageFiles && attachedImageFiles.length > 0) {
+                const url = baseUrl + '/images/edits';
+                const formData = new FormData();
+                formData.append('model', model.model_id);
+                formData.append('prompt', prompt);
+                formData.append('size', '1024x1024');
+
+                for (const f of attachedImageFiles) {
+                    if (f.data) {
+                        const blob = f.data.includes('base64,')
+                            ? await (await fetch(f.data)).blob()
+                            : await (await fetch('data:image/png;base64,' + f.data)).blob();
+                        formData.append('image', blob, f.name || 'image.png');
+                    }
+                }
+
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + model.api_key },
+                    body: formData
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error('图片编辑失败: ' + (err.error?.message || resp.status));
+                }
+                const data = await resp.json();
+                if (data.data?.[0]) {
+                    if (data.data[0].b64_json) return 'data:image/png;base64,' + data.data[0].b64_json;
+                    if (data.data[0].url) return data.data[0].url;
+                }
+                throw new Error('未生成图片');
+            }
+
+            // 文生图
+            const url = baseUrl + '/images/generations';
             const headers = {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + model.api_key
@@ -2665,8 +2725,17 @@ function usernameToEmail(username) {
 
         // 统一图片生成入口
         async function sendImageRequest(model, prompt, attachedImageFiles) {
+            // GPT Image系列 - 直接传文件数据（文生图用 /images/generations，图生图用 /images/edits）
+            if (isGptImageModel(model)) {
+                if (isGptsapi(model.api_url)) {
+                    return await sendGptImageRequest(model, prompt, attachedImageFiles);
+                } else {
+                    return await sendGptImageStandard(model, prompt, attachedImageFiles);
+                }
+            }
+
+            // Gemini Image系列 - 使用 chat/completions 接口，需要图片URL
             let imageUrls = [];
-            // 如果有附件图片，先上传到临时图床
             if (attachedImageFiles && attachedImageFiles.length > 0) {
                 for (const f of attachedImageFiles) {
                     if (f.type?.startsWith('image/') && f.data) {
@@ -2676,13 +2745,7 @@ function usernameToEmail(username) {
                 }
             }
 
-            if (isGptImageModel(model)) {
-                if (isGptsapi(model.api_url)) {
-                    return await sendGptImageRequest(model, prompt, imageUrls.length > 0 ? imageUrls : null);
-                } else {
-                    return await sendGptImageStandard(model, prompt, imageUrls);
-                }
-            } else if (isGeminiImageModel(model)) {
+            if (isGeminiImageModel(model)) {
                 return await sendGeminiImageRequest(model, prompt, imageUrls.length > 0 ? imageUrls : null);
             } else {
                 return await sendStandardImageRequest(model, prompt);
