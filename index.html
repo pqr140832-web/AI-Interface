@@ -2552,6 +2552,9 @@ function usernameToEmail(username) {
                     body: formData
                 });
                 if (!resp.ok) {
+                    if (resp.status === 404) {
+                        throw new Error('当前API不支持图生图（/images/edits），请使用文生图功能或更换API提供商');
+                    }
                     const err = await resp.json().catch(() => ({}));
                     throw new Error('图片编辑失败: ' + (err.error?.message || resp.status));
                 }
@@ -2617,6 +2620,9 @@ function usernameToEmail(username) {
                     body: formData
                 });
                 if (!resp.ok) {
+                    if (resp.status === 404) {
+                        throw new Error('当前API不支持图生图（/images/edits），请使用文生图功能或更换API提供商');
+                    }
                     const err = await resp.json().catch(() => ({}));
                     throw new Error('图片编辑失败: ' + (err.error?.message || resp.status));
                 }
