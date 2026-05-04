@@ -2490,33 +2490,31 @@ function usernameToEmail(username) {
 
         // 上传图片到临时图床（用于图生图）
         async function uploadImageToTempHost(base64Data) {
+            const blob = base64Data.includes('base64,')
+                ? await (await fetch(base64Data)).blob()
+                : await (await fetch('data:image/png;base64,' + base64Data)).blob();
+
+            // 尝试 telegra.ph
             try {
-                const resp = await fetch('https://telegra.ph/upload', {
-                    method: 'POST',
-                    body: base64Data.includes('base64,')
-                        ? await (await fetch(base64Data)).blob()
-                        : await (await fetch('data:image/png;base64,' + base64Data)).blob()
-                });
+                const resp = await fetch('https://telegra.ph/upload', { method: 'POST', body: blob });
                 const json = await resp.json();
                 if (json[0]?.src) return 'https://telegra.ph' + json[0].src;
             } catch (e) {
-                console.warn('telegra.ph上传失败，尝试imgbb:', e);
+                console.warn('telegra.ph上传失败:', e);
             }
+
+            // 尝试 tmpfiles.org
             try {
-                const resp = await fetch('https://api.imgbb.com/1/upload?key=demo', {
-                    method: 'POST',
-                    body: (() => {
-                        const fd = new FormData();
-                        fd.append('image', base64Data);
-                        return fd;
-                    })()
-                });
+                const fd = new FormData();
+                fd.append('file', blob, 'image.png');
+                const resp = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: fd });
                 const json = await resp.json();
-                if (json.data?.url) return json.data.url;
+                if (json.status === 'success' && json.data?.url) return json.data.url;
             } catch (e) {
-                console.warn('imgbb上传失败:', e);
+                console.warn('tmpfiles.org上传失败:', e);
             }
-            throw new Error('图片上传失败，无法进行图生图');
+
+            throw new Error('图片上传失败（telegra.ph和tmpfiles.org均不可用），无法进行图生图');
         }
 
         // 检测API是否为gptsapi
@@ -2771,6 +2769,7 @@ function usernameToEmail(username) {
                     return await sendGptsapiSyncImage(model, prompt);
                 } else {
                     // gpt-image-2-plus、Gemini图片系列：异步接口，支持文生图和图生图
+                    // 需要先上传图片到临时图床获取URL（gptsapi不支持data URL）
                     let imageUrls = [];
                     if (attachedImageFiles && attachedImageFiles.length > 0) {
                         for (const f of attachedImageFiles) {
