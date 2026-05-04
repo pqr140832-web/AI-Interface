@@ -2525,49 +2525,83 @@ function usernameToEmail(username) {
             return url.includes('gptsapi');
         }
 
-        // GPT Image系列 - gptsapi标准OpenAI图片接口
-        async function sendGptImageRequest(model, prompt, attachedImageFiles) {
-            const baseUrl = model.api_url.replace(/\/$/, '');
+        // 获取gptsapi的基础地址（去掉 /v1 后缀）
+        function getGptsapiBaseUrl(apiUrl) {
+            return apiUrl.replace(/\/$/, '').replace(/\/v1$/, '');
+        }
 
-            // 图生图 - 使用 /images/edits 接口（multipart/form-data）
-            if (attachedImageFiles && attachedImageFiles.length > 0) {
-                const url = baseUrl + '/images/edits';
-                const formData = new FormData();
-                formData.append('model', model.model_id);
-                formData.append('prompt', prompt);
-                formData.append('size', '1024x1024');
+        // 获取模型在gptsapi中的提供商路径前缀
+        // gpt-image-2-plus -> openai, gemini-xxx -> google
+        function getGptsapiModelProvider(modelId) {
+            const id = (modelId || '').toLowerCase();
+            if (id.includes('gemini')) return 'google';
+            if (id.includes('gpt') || id.includes('grok')) return 'openai';
+            return 'openai';
+        }
 
-                for (const f of attachedImageFiles) {
-                    if (f.data) {
-                        const blob = f.data.includes('base64,')
-                            ? await (await fetch(f.data)).blob()
-                            : await (await fetch('data:image/png;base64,' + f.data)).blob();
-                        formData.append('image', blob, f.name || 'image.png');
-                    }
-                }
+        // 判断模型是否使用gptsapi同步接口（/v1/images/generations）
+        // 目前只有 gpt-image-1.5 和 grok-imagine-image 用同步接口
+        function isGptsapiSyncModel(modelId) {
+            const id = (modelId || '').toLowerCase();
+            return id === 'gpt-image-1.5' || id.includes('grok-imagine');
+        }
 
-                const resp = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + model.api_key },
-                    body: formData
-                });
-                if (!resp.ok) {
-                    if (resp.status === 404) {
-                        throw new Error('当前API不支持图生图（/images/edits），请使用文生图功能或更换API提供商');
-                    }
-                    const err = await resp.json().catch(() => ({}));
-                    throw new Error('图片编辑失败: ' + (err.error?.message || resp.status));
-                }
-                const data = await resp.json();
-                if (data.data?.[0]) {
-                    if (data.data[0].b64_json) return 'data:image/png;base64,' + data.data[0].b64_json;
-                    if (data.data[0].url) return data.data[0].url;
-                }
-                throw new Error('未生成图片');
+        // ========== gptsapi 异步轮询图片生成（gpt-image-2-plus, Gemini图片系列） ==========
+        async function sendGptsapiAsyncImage(model, prompt, imageUrls) {
+            const baseUrl = getGptsapiBaseUrl(model.api_url);
+            const provider = getGptsapiModelProvider(model.model_id);
+            const modelId = model.model_id;
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + model.api_key
+            };
+
+            // 选择文生图或图生图端点
+            const hasImages = imageUrls && imageUrls.length > 0;
+            const action = hasImages ? 'image-edit' : 'text-to-image';
+            const endpoint = `${baseUrl}/api/v3/${provider}/${modelId}/${action}`;
+
+            // 构建请求体
+            const body = { prompt: prompt, output_format: 'png' };
+            if (hasImages) body.images = imageUrls;
+
+            // 提交任务
+            const resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error('图片生成失败: ' + (err.error?.message || err.message || resp.status));
             }
+            const submitData = await resp.json();
+            const resultId = submitData.data?.id;
+            if (!resultId) throw new Error('未获取到任务ID，请稍后重试');
 
-            // 文生图 - 使用 /images/generations 接口
-            const url = baseUrl + '/images/generations';
+            // 轮询等待结果（最多3分钟）
+            const pollUrl = `${baseUrl}/api/v3/predictions/${resultId}/result`;
+            for (let i = 0; i < 60; i++) {
+                await new Promise(r => setTimeout(r, 3000));
+                const pollResp = await fetch(pollUrl, { headers });
+                if (!pollResp.ok) continue;
+                const pollData = await pollResp.json();
+                const task = pollData.data;
+                if (task && task.status === 'completed' && task.outputs?.length > 0) {
+                    const output = task.outputs[0];
+                    // 可能是URL或base64
+                    if (output.startsWith('http://') || output.startsWith('https://')) {
+                        return output;
+                    } else {
+                        return 'data:image/png;base64,' + output;
+                    }
+                }
+                if (task && task.status === 'failed') {
+                    throw new Error('图片生成失败: ' + (task.error || '未知错误'));
+                }
+            }
+            throw new Error('图片生成超时（3分钟）');
+        }
+
+        // ========== gptsapi 同步图片生成（gpt-image-1.5, grok-imagine-image） ==========
+        async function sendGptsapiSyncImage(model, prompt) {
+            const url = model.api_url.replace(/\/$/, '') + '/images/generations';
             const headers = {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + model.api_key
@@ -2577,7 +2611,7 @@ function usernameToEmail(username) {
                 prompt: prompt,
                 n: 1,
                 size: '1024x1024',
-                response_format: 'b64_json'
+                quality: 'low'
             };
 
             const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
@@ -2593,7 +2627,7 @@ function usernameToEmail(username) {
             throw new Error('未生成图片');
         }
 
-        // GPT Image系列 - 标准OpenAI接口（非gptsapi）
+        // ========== GPT Image系列 - 非gptsapi的标准OpenAI接口 ==========
         async function sendGptImageStandard(model, prompt, attachedImageFiles) {
             const baseUrl = model.api_url.replace(/\/$/, '');
 
@@ -2655,8 +2689,8 @@ function usernameToEmail(username) {
             throw new Error('未生成图片');
         }
 
-        // Gemini Image系列 - 通过chat/completions接口
-        async function sendGeminiImageRequest(model, prompt, imageUrls) {
+        // ========== Gemini Image系列 - 非gptsapi的chat/completions接口 ==========
+        async function sendGeminiImageChat(model, prompt, imageUrls) {
             const url = model.api_url.replace(/\/$/, '') + '/chat/completions';
             const headers = {
                 'Content-Type': 'application/json',
@@ -2682,26 +2716,22 @@ function usernameToEmail(username) {
                 throw new Error('图片生成失败: ' + (err.error?.message || resp.status));
             }
             const data = await resp.json();
-            // Gemini返回的图片可能是URL或base64
             const msgContent = data.choices?.[0]?.message?.content;
             if (!msgContent) throw new Error('未获取到生成结果');
 
-            // 如果返回的是图片URL
             if (msgContent.startsWith('http://') || msgContent.startsWith('https://')) {
                 return msgContent;
             }
-            // 如果返回的是base64
             if (msgContent.includes('base64,')) {
                 return msgContent;
             }
-            // 如果是markdown图片格式
             const imgMatch = msgContent.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
             if (imgMatch) return imgMatch[1];
 
             throw new Error('无法解析生成的图片');
         }
 
-        // 标准图片生成接口（DALL-E, FLUX等）
+        // ========== 标准图片生成接口（DALL-E, FLUX等其他模型） ==========
         async function sendStandardImageRequest(model, prompt) {
             const url = model.api_url.replace(/\/$/, '') + '/images/generations';
             const headers = {
@@ -2729,31 +2759,46 @@ function usernameToEmail(username) {
             throw new Error('未生成图片');
         }
 
-        // 统一图片生成入口
+        // ========== 统一图片生成入口 ==========
         async function sendImageRequest(model, prompt, attachedImageFiles) {
-            // GPT Image系列 - 直接传文件数据（文生图用 /images/generations，图生图用 /images/edits）
-            if (isGptImageModel(model)) {
-                if (isGptsapi(model.api_url)) {
-                    return await sendGptImageRequest(model, prompt, attachedImageFiles);
+            if (isGptsapi(model.api_url)) {
+                // gptsapi：根据模型选择同步或异步接口
+                if (isGptsapiSyncModel(model.model_id)) {
+                    // gpt-image-1.5、grok-imagine-image：同步接口，不支持图生图
+                    if (attachedImageFiles && attachedImageFiles.length > 0) {
+                        throw new Error(model.model_id + ' 不支持图生图，请使用 gpt-image-2-plus 或 Gemini 图片模型');
+                    }
+                    return await sendGptsapiSyncImage(model, prompt);
                 } else {
-                    return await sendGptImageStandard(model, prompt, attachedImageFiles);
+                    // gpt-image-2-plus、Gemini图片系列：异步接口，支持文生图和图生图
+                    let imageUrls = [];
+                    if (attachedImageFiles && attachedImageFiles.length > 0) {
+                        for (const f of attachedImageFiles) {
+                            if (f.type?.startsWith('image/') && f.data) {
+                                const url = await uploadImageToTempHost(f.data);
+                                imageUrls.push(url);
+                            }
+                        }
+                    }
+                    return await sendGptsapiAsyncImage(model, prompt, imageUrls.length > 0 ? imageUrls : null);
                 }
-            }
-
-            // Gemini Image系列 - 使用 chat/completions 接口，需要图片URL
-            let imageUrls = [];
-            if (attachedImageFiles && attachedImageFiles.length > 0) {
-                for (const f of attachedImageFiles) {
-                    if (f.type?.startsWith('image/') && f.data) {
-                        const url = await uploadImageToTempHost(f.data);
-                        imageUrls.push(url);
+            } else if (isGptImageModel(model)) {
+                // 非gptsapi的GPT Image：标准OpenAI接口
+                return await sendGptImageStandard(model, prompt, attachedImageFiles);
+            } else if (isGeminiImageModel(model)) {
+                // 非gptsapi的Gemini Image：chat/completions接口
+                let imageUrls = [];
+                if (attachedImageFiles && attachedImageFiles.length > 0) {
+                    for (const f of attachedImageFiles) {
+                        if (f.type?.startsWith('image/') && f.data) {
+                            const url = await uploadImageToTempHost(f.data);
+                            imageUrls.push(url);
+                        }
                     }
                 }
-            }
-
-            if (isGeminiImageModel(model)) {
-                return await sendGeminiImageRequest(model, prompt, imageUrls.length > 0 ? imageUrls : null);
+                return await sendGeminiImageChat(model, prompt, imageUrls.length > 0 ? imageUrls : null);
             } else {
+                // 其他图片模型：标准 /images/generations 接口
                 return await sendStandardImageRequest(model, prompt);
             }
         }
