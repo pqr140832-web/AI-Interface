@@ -2494,22 +2494,30 @@ function usernameToEmail(username) {
                 ? await (await fetch(base64Data)).blob()
                 : await (await fetch('data:image/png;base64,' + base64Data)).blob();
 
-            // 尝试 telegra.ph
+            // 尝试 telegra.ph（需要用 FormData）
             try {
-                const resp = await fetch('https://telegra.ph/upload', { method: 'POST', body: blob });
+                const fd = new FormData();
+                fd.append('file', blob, 'image.png');
+                const resp = await fetch('https://telegra.ph/upload', { method: 'POST', body: fd });
                 const json = await resp.json();
                 if (json[0]?.src) return 'https://telegra.ph' + json[0].src;
             } catch (e) {
                 console.warn('telegra.ph上传失败:', e);
             }
 
-            // 尝试 tmpfiles.org
+            // 尝试 tmpfiles.org（需要转换URL为直接下载链接）
             try {
                 const fd = new FormData();
                 fd.append('file', blob, 'image.png');
                 const resp = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: fd });
                 const json = await resp.json();
-                if (json.status === 'success' && json.data?.url) return json.data.url;
+                if (json.status === 'success' && json.data?.url) {
+                    // 将 http://tmpfiles.org/ID/file.png 转为 https://tmpfiles.org/dl/ID/file.png
+                    let url = json.data.url;
+                    url = url.replace('http://', 'https://');
+                    url = url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+                    return url;
+                }
             } catch (e) {
                 console.warn('tmpfiles.org上传失败:', e);
             }
