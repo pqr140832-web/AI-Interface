@@ -2514,6 +2514,30 @@ function usernameToEmail(username) {
                 ? await (await fetch(base64Data)).blob()
                 : await (await fetch('data:image/png;base64,' + base64Data)).blob();
 
+            // 尝试 sm.ms（国内可访问的图床）
+            try {
+                const fd = new FormData();
+                fd.append('smfile', blob, 'image.png');
+                const resp = await fetch('https://sm.ms/api/v2/upload', { method: 'POST', body: fd });
+                const json = await resp.json();
+                if (json.success && json.data?.url) return json.data.url;
+                // sm.ms免费版如果图片已存在会返回existing url
+                if (json.images) return json.images;
+            } catch (e) {
+                console.warn('sm.ms上传失败:', e);
+            }
+
+            // 尝试 imgbb（国内通常可访问）
+            try {
+                const fd = new FormData();
+                fd.append('image', blob);
+                const resp = await fetch('https://api.imgbb.com/1/upload?key=76cfabf7e28f4f0e8409e9e1b3b8e1a6', { method: 'POST', body: fd });
+                const json = await resp.json();
+                if (json.data?.url) return json.data.url;
+            } catch (e) {
+                console.warn('imgbb上传失败:', e);
+            }
+
             // 尝试 telegra.ph
             try {
                 const fd = new FormData();
@@ -2523,33 +2547,6 @@ function usernameToEmail(username) {
                 if (json[0]?.src) return 'https://telegra.ph' + json[0].src;
             } catch (e) {
                 console.warn('telegra.ph上传失败:', e);
-            }
-
-            // 尝试 tmpfiles.org
-            try {
-                const fd = new FormData();
-                fd.append('file', blob, 'image.png');
-                const resp = await fetch('https://tmpfiles.org/api/v1/upload', { method: 'POST', body: fd });
-                const json = await resp.json();
-                if (json.status === 'success' && json.data?.url) {
-                    let url = json.data.url;
-                    url = url.replace('http://', 'https://');
-                    url = url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-                    return url;
-                }
-            } catch (e) {
-                console.warn('tmpfiles.org上传失败:', e);
-            }
-
-            // 尝试 0x0.st
-            try {
-                const fd = new FormData();
-                fd.append('file', blob, 'image.png');
-                const resp = await fetch('https://0x0.st', { method: 'POST', body: fd });
-                const text = await resp.text();
-                if (text.startsWith('https://')) return text.trim();
-            } catch (e) {
-                console.warn('0x0.st上传失败:', e);
             }
 
             // 尝试 catbox.moe
@@ -2564,7 +2561,7 @@ function usernameToEmail(username) {
                 console.warn('catbox.moe上传失败:', e);
             }
 
-            // 尝试 litterbox.catbox.moe（临时，24小时有效）
+            // 尝试 litterbox.catbox.moe（临时24小时）
             try {
                 const fd = new FormData();
                 fd.append('reqtype', 'fileupload');
@@ -2575,6 +2572,17 @@ function usernameToEmail(username) {
                 if (text.startsWith('https://')) return text.trim();
             } catch (e) {
                 console.warn('litterbox上传失败:', e);
+            }
+
+            // 尝试 0x0.st
+            try {
+                const fd = new FormData();
+                fd.append('file', blob, 'image.png');
+                const resp = await fetch('https://0x0.st', { method: 'POST', body: fd });
+                const text = await resp.text();
+                if (text.startsWith('https://')) return text.trim();
+            } catch (e) {
+                console.warn('0x0.st上传失败:', e);
             }
 
             throw new Error('图片上传失败（所有图床均不可用），无法进行图生图');
