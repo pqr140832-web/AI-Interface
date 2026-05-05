@@ -1894,7 +1894,7 @@ function usernameToEmail(username) {
                 // 同步模型的api_key为所属API的最新key（修复API key更新后模型仍用旧key的问题）
                 if (savedApis.length > 0) {
                     const apiKeyMap = {};
-                    for (const api of savedApis) { apiKeyMap[api.id] = api.api_key; }
+                    for (const api of savedApis) { apiKeyMap[api.id] = api.key; }
                     let needUpdate = false;
                     for (const m of models) {
                         const latestKey = apiKeyMap[m.api_id];
@@ -2846,12 +2846,12 @@ function usernameToEmail(username) {
         async function sendImageRequest(model, prompt, attachedImageFiles, onProgress) {
             // 动态获取所属API的最新key，避免模型存的旧key导致401
             const owningApi = savedApis.find(a => a.id === model.api_id);
-            if (owningApi && owningApi.api_key !== model.api_key) {
-                model.api_key = owningApi.api_key;
-                try { await sb.from('user_models').update({ api_key: owningApi.api_key }).eq('id', model.id); } catch(e) {}
+            if (owningApi && owningApi.key !== model.api_key) {
+                model.api_key = owningApi.key;
+                try { await sb.from('user_models').update({ api_key: owningApi.key }).eq('id', model.id); } catch(e) {}
             }
             // 查找同URL的所有API，用于401时切换key重试
-            const sameUrlApis = savedApis.filter(a => a.api_url && a.api_url.replace(/\/$/, '') === (model.api_url || '').replace(/\/$/, '') && a.api_key !== model.api_key);
+            const sameUrlApis = savedApis.filter(a => a.url && a.url.replace(/\/$/, '') === (model.api_url || '').replace(/\/$/, '') && a.key !== model.api_key);
 
             async function tryWithKey(useModel) {
                 return await _sendImageRequestInner(useModel, prompt, attachedImageFiles, onProgress);
@@ -2864,10 +2864,10 @@ function usernameToEmail(username) {
                     if (onProgress) onProgress('API Key无效，正在尝试切换...');
                     for (const altApi of sameUrlApis) {
                         try {
-                            const altModel = { ...model, api_key: altApi.api_key };
+                            const altModel = { ...model, api_key: altApi.key };
                             const result = await tryWithKey(altModel);
                             // 成功则更新模型key
-                            try { await sb.from('user_models').update({ api_key: altApi.api_key, api_id: altApi.id }).eq('id', model.id); model.api_key = altApi.api_key; model.api_id = altApi.id; } catch(e2) {}
+                            try { await sb.from('user_models').update({ api_key: altApi.key, api_id: altApi.id }).eq('id', model.id); model.api_key = altApi.key; model.api_id = altApi.id; } catch(e2) {}
                             return result;
                         } catch (e2) { continue; }
                     }
