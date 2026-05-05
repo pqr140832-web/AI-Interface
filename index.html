@@ -2608,7 +2608,7 @@ function usernameToEmail(username) {
         }
 
         // ========== gptsapi 异步轮询图片生成（gpt-image-2-plus, Gemini图片系列） ==========
-        async function sendGptsapiAsyncImage(model, prompt, imageUrls, onProgress) {
+        async function sendGptsapiAsyncImage(model, prompt, imageUrls, onProgress, retryWithHost) {
             const baseUrl = getGptsapiBaseUrl(model.api_url);
             const provider = getGptsapiModelProvider(model.model_id);
             const modelId = model.model_id;
@@ -2638,6 +2638,11 @@ function usernameToEmail(username) {
                     errMsg = errJson.error?.message || errJson.message || errMsg;
                 } catch (e) {
                     if (errText) errMsg = errText.substring(0, 200);
+                }
+                // 如果是图生图且使用了base64 data URL导致失败，自动回退到图床上传
+                if (!retryWithHost && hasImages && imageUrls.some(u => u.startsWith('data:'))) {
+                    if (onProgress) onProgress('data URL不受支持，正在上传图片到图床...');
+                    throw new Error('NEED_IMAGE_HOST');
                 }
                 throw new Error('提交失败(' + resp.status + '): ' + errMsg);
             }
@@ -2860,18 +2865,32 @@ function usernameToEmail(username) {
                     return await sendGptsapiSyncImage(model, prompt);
                 } else {
                     // gpt-image-2-plus、Gemini图片系列：异步接口，支持文生图和图生图
-                    // 需要先上传图片到临时图床获取URL（gptsapi不支持data URL）
-                    let imageUrls = [];
+                    // 先尝试直接传base64 data URL（无需图床），失败则回退到图床上传
+                    let imageDataUrls = [];
                     if (attachedImageFiles && attachedImageFiles.length > 0) {
-                        if (onProgress) onProgress('正在上传图片到临时图床...');
                         for (const f of attachedImageFiles) {
                             if (f.type?.startsWith('image/') && f.data) {
-                                const url = await uploadImageToTempHost(f.data);
-                                imageUrls.push(url);
+                                imageDataUrls.push(f.data.startsWith('data:') ? f.data : 'data:image/png;base64,' + f.data);
                             }
                         }
                     }
-                    return await sendGptsapiAsyncImage(model, prompt, imageUrls.length > 0 ? imageUrls : null, onProgress);
+                    try {
+                        return await sendGptsapiAsyncImage(model, prompt, imageDataUrls.length > 0 ? imageDataUrls : null, onProgress, false);
+                    } catch (e) {
+                        if (e.message === 'NEED_IMAGE_HOST' && imageDataUrls.length > 0) {
+                            // data URL不被支持，回退到图床上传
+                            if (onProgress) onProgress('正在上传图片到图床...');
+                            let hostedUrls = [];
+                            for (const f of attachedImageFiles) {
+                                if (f.type?.startsWith('image/') && f.data) {
+                                    const url = await uploadImageToTempHost(f.data);
+                                    hostedUrls.push(url);
+                                }
+                            }
+                            return await sendGptsapiAsyncImage(model, prompt, hostedUrls, onProgress, true);
+                        }
+                        throw e;
+                    }
                 }
             } else if (isGptImageModel(model)) {
                 // 非gptsapi的GPT Image：标准OpenAI接口
