@@ -2850,6 +2850,33 @@ function usernameToEmail(username) {
                 model.api_key = owningApi.api_key;
                 try { await sb.from('user_models').update({ api_key: owningApi.api_key }).eq('id', model.id); } catch(e) {}
             }
+            // 查找同URL的所有API，用于401时切换key重试
+            const sameUrlApis = savedApis.filter(a => a.api_url && a.api_url.replace(/\/$/, '') === (model.api_url || '').replace(/\/$/, '') && a.api_key !== model.api_key);
+
+            async function tryWithKey(useModel) {
+                return await _sendImageRequestInner(useModel, prompt, attachedImageFiles, onProgress);
+            }
+
+            try {
+                return await tryWithKey(model);
+            } catch (e) {
+                if ((e.message.includes('401') || e.message.includes('提交失败')) && sameUrlApis.length > 0) {
+                    if (onProgress) onProgress('API Key无效，正在尝试切换...');
+                    for (const altApi of sameUrlApis) {
+                        try {
+                            const altModel = { ...model, api_key: altApi.api_key };
+                            const result = await tryWithKey(altModel);
+                            // 成功则更新模型key
+                            try { await sb.from('user_models').update({ api_key: altApi.api_key, api_id: altApi.id }).eq('id', model.id); model.api_key = altApi.api_key; model.api_id = altApi.id; } catch(e2) {}
+                            return result;
+                        } catch (e2) { continue; }
+                    }
+                }
+                throw e;
+            }
+        }
+
+        async function _sendImageRequestInner(model, prompt, attachedImageFiles, onProgress) {
             if (isGptsapi(model.api_url)) {
                 // gptsapi：根据模型选择同步或异步接口
                 if (isGptsapiSyncModel(model.model_id)) {
