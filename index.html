@@ -1891,6 +1891,26 @@ function usernameToEmail(username) {
                     .eq('user_id', currentUser.id);
                 
                 models = modelsData || [];
+                // 同步模型的api_key为所属API的最新key（修复API key更新后模型仍用旧key的问题）
+                if (savedApis.length > 0) {
+                    const apiKeyMap = {};
+                    for (const api of savedApis) { apiKeyMap[api.id] = api.api_key; }
+                    let needUpdate = false;
+                    for (const m of models) {
+                        const latestKey = apiKeyMap[m.api_id];
+                        if (latestKey && m.api_key !== latestKey) {
+                            m.api_key = latestKey;
+                            needUpdate = true;
+                        }
+                    }
+                    if (needUpdate) {
+                        try {
+                            for (const m of models) {
+                                await sb.from('user_models').update({ api_key: m.api_key }).eq('id', m.id);
+                            }
+                        } catch (e) { console.warn('同步模型API key失败:', e); }
+                    }
+                }
                 if (models.length && !currentModelId) {
                     currentModelId = models[0].id;
                 }
@@ -2788,6 +2808,12 @@ function usernameToEmail(username) {
 
         // ========== 统一图片生成入口 ==========
         async function sendImageRequest(model, prompt, attachedImageFiles, onProgress) {
+            // 动态获取所属API的最新key，避免模型存的旧key导致401
+            const owningApi = savedApis.find(a => a.id === model.api_id);
+            if (owningApi && owningApi.api_key !== model.api_key) {
+                model.api_key = owningApi.api_key;
+                try { await sb.from('user_models').update({ api_key: owningApi.api_key }).eq('id', model.id); } catch(e) {}
+            }
             if (isGptsapi(model.api_url)) {
                 // gptsapi：根据模型选择同步或异步接口
                 if (isGptsapiSyncModel(model.model_id)) {
