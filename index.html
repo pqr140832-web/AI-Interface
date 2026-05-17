@@ -2490,7 +2490,7 @@ function usernameToEmail(username) {
         // ==================== 模型类型检测 ====================
         function isImageModel(model) {
             const id = (model.model_id || '').toLowerCase();
-            return id.includes('image') || id.includes('dall-e') || id.includes('dalle') || id.includes('flux') || id.includes('stable-diffusion') || id.includes('midjourney') || id.includes('imagen') || id.includes('sd ');
+            return id.includes('image') || id.includes('dall-e') || id.includes('dalle') || id.includes('flux') || id.includes('stable-diffusion') || id.includes('midjourney') || id.includes('imagen') || id.includes('sd ') || id.includes('wanx') || id.includes('cogview') || id.includes('hunyuan') || id.includes('kolors') || id === 'sd' || id.startsWith('sd-') || id.includes('sdxl') || id.includes('playground') || id.includes('ideogram') || id.includes('recraft') || id.includes('jimeng');
         }
 
         function isGptImageModel(model) {
@@ -2596,11 +2596,15 @@ function usernameToEmail(username) {
             return 'openai';
         }
 
+        // 检测API是否为ekan8
+        function isEkan8(apiUrl) {
+            return (apiUrl || '').toLowerCase().includes('ekan8');
+        }
+
         // 判断模型是否使用gptsapi同步接口（/v1/images/generations）
-        // 目前只有 gpt-image-1.5 和 grok-imagine-image 用同步接口
         function isGptsapiSyncModel(modelId) {
             const id = (modelId || '').toLowerCase();
-            return id === 'gpt-image-1.5' || id.includes('grok-imagine');
+            return id === 'gpt-image-1.5' || id.includes('grok-imagine') || id.includes('dall-e') || id.includes('dalle');
         }
 
         // ========== gptsapi 异步轮询图片生成（gpt-image-2-plus, Gemini图片系列） ==========
@@ -2842,6 +2846,34 @@ function usernameToEmail(username) {
             throw new Error('未生成图片');
         }
 
+        // ========== ekan8 标准图片生成（不强制 response_format，兼容性更好） ==========
+        async function sendEkan8ImageRequest(model, prompt, onProgress) {
+            const url = model.api_url.replace(/\/$/, '') + '/images/generations';
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + model.api_key
+            };
+            const body = {
+                model: model.model_id,
+                prompt: prompt,
+                n: 1,
+                size: '1024x1024'
+            };
+
+            if (onProgress) onProgress('正在使用 ekan8 生成图片...');
+            const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error('图片生成失败: ' + (err.error?.message || resp.status));
+            }
+            const data = await resp.json();
+            if (data.data?.[0]) {
+                if (data.data[0].b64_json) return 'data:image/png;base64,' + data.data[0].b64_json;
+                if (data.data[0].url) return data.data[0].url;
+            }
+            throw new Error('未生成图片');
+        }
+
         // ========== 统一图片生成入口 ==========
         async function sendImageRequest(model, prompt, attachedImageFiles, onProgress) {
             // 动态获取所属API的最新key，避免模型存的旧key导致401
@@ -2915,6 +2947,9 @@ function usernameToEmail(username) {
                         throw e;
                     }
                 }
+            } else if (isEkan8(model.api_url)) {
+                // ekan8：标准 OpenAI 兼容接口（不强制 response_format）
+                return await sendEkan8ImageRequest(model, prompt, onProgress);
             } else if (isGptImageModel(model)) {
                 // 非gptsapi的GPT Image：标准OpenAI接口
                 return await sendGptImageStandard(model, prompt, attachedImageFiles);
